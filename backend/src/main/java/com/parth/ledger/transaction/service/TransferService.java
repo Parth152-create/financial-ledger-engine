@@ -17,10 +17,13 @@ import com.parth.ledger.transaction.exception.InsufficientBalanceException;
 import com.parth.ledger.transaction.exception.InvalidAmountException;
 import com.parth.ledger.transaction.exception.SameAccountTransferException;
 import com.parth.ledger.transaction.exception.UnbalancedLedgerException;
+import com.parth.ledger.idempotency.IdempotencyCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,13 +46,16 @@ public class TransferService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
+    private final IdempotencyCacheService idempotencyCacheService;
 
     public TransferService(AccountRepository accountRepository,
                            TransactionRepository transactionRepository,
-                           LedgerEntryRepository ledgerEntryRepository) {
+                           LedgerEntryRepository ledgerEntryRepository,
+                           IdempotencyCacheService idempotencyCacheService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
+        this.idempotencyCacheService = idempotencyCacheService;
     }
 
     /**
@@ -97,6 +103,43 @@ public class TransferService {
         // Standardize scale to 4 decimal places matching PostgreSQL NUMERIC(19,4)
         BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
         String currency = request.currency().trim().toUpperCase();
+
+        // Fast-Path: Check Redis idempotency cache before initiating DB transaction / locking
+        Optional<TransferResponseDto> cachedResponse = Optional.empty();
+        try {
+            cachedResponse = idempotencyCacheService.get(cleanIdempotencyKey);
+        } catch (Exception e) {
+            log.warn("Error accessing Redis idempotency cache for key '{}': {}. Failing open to PostgreSQL.",
+                    cleanIdempotencyKey, e.getMessage());
+        }
+
+        if (cachedResponse.isPresent()) {
+            TransferResponseDto cached = cachedResponse.get();
+            boolean sameSource = cached.sourceAccountId().equals(request.sourceAccountId());
+            boolean sameDest = cached.destinationAccountId().equals(request.destinationAccountId());
+            boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
+            boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
+
+            if (sameSource && sameDest && sameAmount && sameCurrency) {
+                log.info("Redis idempotency fast-path hit for key '{}'. Returning cached transaction {}",
+                        cleanIdempotencyKey, cached.transactionId());
+                return cached;
+            } else {
+                log.warn("Idempotency conflict detected in Redis cache for key '{}'. Cached: [source={}, dest={}, amount={}, currency={}], Request: [source={}, dest={}, amount={}, currency={}]",
+                        cleanIdempotencyKey,
+                        cached.sourceAccountId(),
+                        cached.destinationAccountId(),
+                        cached.amount(),
+                        cached.currency(),
+                        request.sourceAccountId(),
+                        request.destinationAccountId(),
+                        scaledAmount,
+                        currency);
+                throw new IdempotencyConflictException(
+                        "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transfer with different parameters"
+                );
+            }
+        }
 
         // 6. Pre-lock Idempotency Check: Fast return for committed retries or conflict detection
         Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
@@ -212,8 +255,32 @@ public class TransferService {
         log.info("Successfully executed transfer: txId={}, amount={} {}, from={} to={}",
                 transaction.getId(), scaledAmount, currency, sourceId, destinationId);
 
+        TransferResponseDto response = TransferResponseDto.from(transaction);
+
+        // Store successful response in Redis ONLY after the PostgreSQL transaction commits
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        idempotencyCacheService.set(cleanIdempotencyKey, response);
+                    } catch (Exception e) {
+                        log.warn("Failed to cache response in Redis after commit for key '{}': {}",
+                                cleanIdempotencyKey, e.getMessage());
+                    }
+                }
+            });
+        } else {
+            try {
+                idempotencyCacheService.set(cleanIdempotencyKey, response);
+            } catch (Exception e) {
+                log.warn("Failed to cache response in Redis for key '{}': {}",
+                        cleanIdempotencyKey, e.getMessage());
+            }
+        }
+
         // 18. Return transaction result DTO
-        return TransferResponseDto.from(transaction);
+        return response;
     }
 
     private TransferResponseDto handleExistingTransaction(
@@ -231,7 +298,13 @@ public class TransferService {
         if (sameSource && sameDest && sameAmount && sameCurrency) {
             log.info("Idempotent retry detected for key '{}'. Returning existing transaction {}",
                     idempotencyKey, existing.getId());
-            return TransferResponseDto.from(existing);
+            TransferResponseDto response = TransferResponseDto.from(existing);
+            try {
+                idempotencyCacheService.set(idempotencyKey, response);
+            } catch (Exception e) {
+                log.warn("Failed to repopulate Redis cache for key '{}': {}", idempotencyKey, e.getMessage());
+            }
+            return response;
         } else {
             log.warn("Idempotency conflict for key '{}'. Existing: [source={}, dest={}, amount={}, currency={}], Request: [source={}, dest={}, amount={}, currency={}]",
                     idempotencyKey,
