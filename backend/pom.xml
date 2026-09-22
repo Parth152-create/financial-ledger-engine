@@ -11,8 +11,8 @@
 	<groupId>com.parth</groupId>
 	<artifactId>ledger-engine</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>Financial Ledger Engine</name>
+	<description>High-throughput financial ledger engine with double-entry accounting, concurrency control, idempotency, and reconciliation.</description>
 	<url/>
 	<licenses>
 		<license/>
