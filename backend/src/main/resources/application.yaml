@@ -6,10 +6,10 @@ spring:
     name: ledger-engine
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ledger}}
-    username: ${POSTGRES_USER:ledger}
-    password: ${POSTGRES_PASSWORD:}
-    driver-class-name: org.postgresql.Driver
+          url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5434}/${POSTGRES_DB:ledger}}
+          username: ${POSTGRES_USER:ledger}
+          password: ${POSTGRES_PASSWORD:}
+          driver-class-name: org.postgresql.Driver
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
