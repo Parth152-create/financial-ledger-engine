@@ -18,6 +18,9 @@ import com.parth.ledger.transaction.exception.InvalidAmountException;
 import com.parth.ledger.transaction.exception.SameAccountTransferException;
 import com.parth.ledger.transaction.exception.UnbalancedLedgerException;
 import com.parth.ledger.idempotency.IdempotencyCacheService;
+import com.parth.ledger.security.AccountOwnershipException;
+import com.parth.ledger.security.AuthenticatedUserService;
+import com.parth.ledger.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -47,15 +50,18 @@ public class TransferService {
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final IdempotencyCacheService idempotencyCacheService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     public TransferService(AccountRepository accountRepository,
                            TransactionRepository transactionRepository,
                            LedgerEntryRepository ledgerEntryRepository,
-                           IdempotencyCacheService idempotencyCacheService) {
+                           IdempotencyCacheService idempotencyCacheService,
+                           AuthenticatedUserService authenticatedUserService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
+        this.authenticatedUserService = authenticatedUserService;
     }
 
     /**
@@ -104,6 +110,9 @@ public class TransferService {
         BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
         String currency = request.currency().trim().toUpperCase();
 
+        // 5. Resolve authenticated application user from SecurityContext
+        User authenticatedUser = authenticatedUserService.getCurrentUser();
+
         // Fast-Path: Check Redis idempotency cache before initiating DB transaction / locking
         Optional<TransferResponseDto> cachedResponse = Optional.empty();
         try {
@@ -121,6 +130,12 @@ public class TransferService {
             boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
 
             if (sameSource && sameDest && sameAmount && sameCurrency) {
+                // Verify source account ownership on Redis fast-path hit
+                if (!accountRepository.existsByIdAndUserId(request.sourceAccountId(), authenticatedUser.getId())) {
+                    log.warn("Unauthorized attempt to access cached transfer for source account {} by user {}",
+                            request.sourceAccountId(), authenticatedUser.getId());
+                    throw new AccountOwnershipException("Authenticated user does not own source account");
+                }
                 log.info("Redis idempotency fast-path hit for key '{}'. Returning cached transaction {}",
                         cleanIdempotencyKey, cached.transactionId());
                 return cached;
@@ -144,7 +159,7 @@ public class TransferService {
         // 6. Pre-lock Idempotency Check: Fast return for committed retries or conflict detection
         Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
         if (existingTx.isPresent()) {
-            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanIdempotencyKey);
+            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanIdempotencyKey, authenticatedUser);
         }
 
         // 8. Deterministic Lock Ordering:
@@ -179,7 +194,16 @@ public class TransferService {
         // thread committed the transaction to avoid duplicate transfers.
         Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
         if (txAfterLock.isPresent()) {
-            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanIdempotencyKey);
+            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanIdempotencyKey, authenticatedUser);
+        }
+
+        // 9. Source Account Ownership Authorization:
+        // Verify that the authenticated application user is the owner of the source account being debited.
+        // This check occurs while holding the pessimistic write lock on the source account to eliminate TOCTOU races.
+        if (!sourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
+            log.warn("Unauthorized transfer: user {} does not own source account {}",
+                    authenticatedUser.getId(), sourceId);
+            throw new AccountOwnershipException("Authenticated user does not own source account");
         }
 
         // 2 & 5. Validate currency compatibility
@@ -288,7 +312,8 @@ public class TransferService {
             TransferRequestDto request,
             BigDecimal scaledAmount,
             String currency,
-            String idempotencyKey) {
+            String idempotencyKey,
+            User authenticatedUser) {
 
         boolean sameSource = existing.getSourceAccount().getId().equals(request.sourceAccountId());
         boolean sameDest = existing.getDestinationAccount().getId().equals(request.destinationAccountId());
@@ -296,6 +321,13 @@ public class TransferService {
         boolean sameCurrency = existing.getCurrency().equalsIgnoreCase(currency);
 
         if (sameSource && sameDest && sameAmount && sameCurrency) {
+            // Verify source account ownership on database idempotency retry
+            if (!existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
+                log.warn("Unauthorized attempt to access existing transaction {} for source account {} by user {}",
+                        existing.getId(), existing.getSourceAccount().getId(), authenticatedUser.getId());
+                throw new AccountOwnershipException("Authenticated user does not own source account");
+            }
+
             log.info("Idempotent retry detected for key '{}'. Returning existing transaction {}",
                     idempotencyKey, existing.getId());
             TransferResponseDto response = TransferResponseDto.from(existing);

@@ -29,10 +29,6 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6380}
 
-ledger:
-  idempotency:
-    ttl-seconds: ${LEDGER_IDEMPOTENCY_TTL_SECONDS:86400}
-
   security:
     oauth2:
       client:
@@ -44,6 +40,10 @@ ledger:
               - openid
               - profile
               - email
+
+ledger:
+  idempotency:
+    ttl-seconds: ${LEDGER_IDEMPOTENCY_TTL_SECONDS:86400}
 
 management:
   endpoints:

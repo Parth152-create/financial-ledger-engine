@@ -17,13 +17,17 @@ import com.parth.ledger.transaction.exception.SameAccountTransferException;
 import com.parth.ledger.transaction.service.TransferService;
 import com.parth.ledger.user.User;
 import com.parth.ledger.user.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,6 +76,15 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         aliceUsdAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
         bobUsdAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
         charlieEurAccount = accountRepository.save(new Account(charlieUser, "EUR", new BigDecimal("300.0000")));
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("alice@ledger.com", null, Collections.emptyList())
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test

@@ -16,6 +16,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -86,6 +88,9 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
             final String key = "tx-opp-ab-" + i;
             executor.submit(() -> {
                 try {
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken("alice.concurrency@ledger.com", null, Collections.emptyList())
+                    );
                     startLatch.await();
                     transferService.executeTransfer(key, new TransferRequestDto(
                             accountA.getId(),
@@ -97,6 +102,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                 } catch (Throwable t) {
                     failures.add(t);
                 } finally {
+                    SecurityContextHolder.clearContext();
                     endLatch.countDown();
                 }
             });
@@ -107,6 +113,9 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
             final String key = "tx-opp-ba-" + i;
             executor.submit(() -> {
                 try {
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken("bob.concurrency@ledger.com", null, Collections.emptyList())
+                    );
                     startLatch.await();
                     transferService.executeTransfer(key, new TransferRequestDto(
                             accountB.getId(),
@@ -118,6 +127,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                 } catch (Throwable t) {
                     failures.add(t);
                 } finally {
+                    SecurityContextHolder.clearContext();
                     endLatch.countDown();
                 }
             });
@@ -183,6 +193,9 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
             final String key = "tx-exhaust-" + i;
             executor.submit(() -> {
                 try {
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken("alice.concurrency@ledger.com", null, Collections.emptyList())
+                    );
                     startLatch.await();
                     transferService.executeTransfer(key, new TransferRequestDto(
                             accountA.getId(),
@@ -196,6 +209,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                 } catch (Throwable t) {
                     unexpectedFailures.add(t);
                 } finally {
+                    SecurityContextHolder.clearContext();
                     endLatch.countDown();
                 }
             });
@@ -265,12 +279,16 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
         for (int i = 0; i < concurrentRetries; i++) {
             executor.submit(() -> {
                 try {
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken("alice.concurrency@ledger.com", null, Collections.emptyList())
+                    );
                     startLatch.await();
                     TransferResponseDto response = transferService.executeTransfer(sharedKey, request);
                     returnedTransactionIds.add(response.transactionId());
                 } catch (Throwable t) {
                     errors.add(t);
                 } finally {
+                    SecurityContextHolder.clearContext();
                     endLatch.countDown();
                 }
             });

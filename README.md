@@ -30,3 +30,15 @@ financial-ledger-engine/
 ├── load-testing/
 ├── docs/
 └── database/
+```
+
+## Security & Authentication
+
+- **Google OAuth2**: Authenticates user identity via Google OpenID Connect / OAuth2. Authenticated emails map to PostgreSQL `users`.
+- **Account Ownership Authorization**: Transfer operations strictly verify that the authenticated caller owns the source account being debited. Unauthorized debit attempts are rejected with HTTP 403 Forbidden.
+- **Local OAuth Configuration**:
+  ```bash
+  export GOOGLE_CLIENT_ID=your-google-client-id
+  export GOOGLE_CLIENT_SECRET=your-google-client-secret
+  ```
+  Automated tests mock authentication and do not require external Google credentials or network access.

@@ -13,19 +13,21 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest
-@Testcontainers
 public abstract class BaseIntegrationTest {
 
-    @Container
     @ServiceConnection
     protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("ledger_test")
             .withUsername("ledger_user")
             .withPassword("ledger_pass");
 
-    @Container
     protected static final GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(6379);
+
+    static {
+        postgres.start();
+        redis.start();
+    }
 
     @DynamicPropertySource
     static void configureRedis(DynamicPropertyRegistry registry) {
