@@ -86,6 +86,9 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        if (jdbcTemplate != null) {
+            jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
+        }
         ledgerEntryRepository.deleteAll();
         transactionRepository.deleteAll();
         accountRepository.deleteAll();

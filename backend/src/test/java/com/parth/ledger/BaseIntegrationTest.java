@@ -38,6 +38,19 @@ public abstract class BaseIntegrationTest {
     @Autowired(required = false)
     protected StringRedisTemplate redisTemplate;
 
+    @Autowired(required = false)
+    protected org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @org.junit.jupiter.api.BeforeEach
+    void truncateLedgerEntriesBeforeEach() {
+        if (jdbcTemplate != null) {
+            try {
+                jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     protected void clearRedis() {
         if (redisTemplate != null && redisTemplate.getConnectionFactory() != null) {
             try {
