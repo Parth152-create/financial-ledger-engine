@@ -56,3 +56,20 @@ ALTER TABLE accounts
 -- Indexes for efficient queries
 CREATE INDEX idx_accounts_account_type ON accounts(account_type);
 CREATE INDEX idx_accounts_status ON accounts(status);
+
+-- 6. Initial System Clearing Account Setup
+-- Seed platform-owned system clearing account for USD (supported currency)
+INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number)
+VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    NULL,
+    'USD',
+    0.0000,
+    0,
+    NOW(),
+    NOW(),
+    'SYSTEM_CLEARING',
+    'ACTIVE',
+    'ACCT-SYSTEM-CLEARING-01'
+)
+ON CONFLICT (id) DO NOTHING;

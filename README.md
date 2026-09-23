@@ -42,3 +42,10 @@ financial-ledger-engine/
   export GOOGLE_CLIENT_SECRET=your-google-client-secret
   ```
   Automated tests mock authentication and do not require external Google credentials or network access.
+
+## Documentation
+
+- [Account Model & Database Hardening (V2)](docs/ACCOUNT_MODEL.md)
+- [Transfer API Specification](docs/TRANSFER_API.md)
+- [Financial Reconciliation Architecture](docs/RECONCILIATION.md)
+- [Failure Handling & Resiliency](docs/FAILURE_HANDLING.md)

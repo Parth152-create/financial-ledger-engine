@@ -97,6 +97,22 @@ Before commit, the service verifies `totalDebits == totalCredits`. If this accou
 
 ---
 
+## Account Type & Lifecycle Status Enforcement
+
+Prior to financial balance mutation, `TransferService` validates account types and account lifecycle statuses while holding pessimistic row-level write locks:
+
+1. **Account Type Restrictions**:
+   - Transfers via `/api/v1/transfers` are strictly permitted between `USER_CHECKING` accounts.
+   - Any attempt to use a `SYSTEM_CLEARING` account (as source or destination) is rejected with `400 Bad Request` (`InvalidAccountTypeException`). System accounts are platform-managed and cannot participate in direct peer-to-peer user transfers.
+2. **Account Lifecycle Status Rules**:
+   - **`ACTIVE`**: Can debit and credit freely.
+   - **`FROZEN`**: Cannot debit, cannot credit. Transfer attempts involving a `FROZEN` account fail immediately with `422 Unprocessable Content` (`AccountFrozenException`).
+   - **`CLOSED`**: Cannot debit, cannot credit. Transfer attempts involving a `CLOSED` account fail immediately with `422 Unprocessable Content` (`AccountClosedException`).
+3. **Fail-Fast Invariant**:
+   - Account status and account type checks execute before balance checks and balance modifications. Non-active accounts will never have their balances altered or ledger entries recorded.
+
+---
+
 ## Error Responses & HTTP Status Code Mapping
 
 Error responses return a structured JSON body without stack traces:
@@ -114,14 +130,19 @@ Error responses return a structured JSON body without stack traces:
 | HTTP Status | Condition / Exception | Description |
 |---|---|---|
 | `400 Bad Request` | `SameAccountTransferException` | Source and destination account IDs are identical |
+| `400 Bad Request` | `InvalidAccountTypeException` | Source or destination account is not `USER_CHECKING` (e.g., system clearing account attempted via user transfer endpoint) |
 | `400 Bad Request` | `CurrencyMismatchException` | Request currency or account currencies do not match |
 | `400 Bad Request` | `InvalidAmountException` | Transfer amount is zero, negative, or invalid scale |
 | `400 Bad Request` | `MissingRequestHeaderException` | `Idempotency-Key` header missing or blank |
 | `400 Bad Request` | `MethodArgumentNotValidException` | Bean validation errors on request fields |
 | `400 Bad Request` | `HttpMessageNotReadableException` | Malformed JSON request body |
+| `403 Forbidden` | `AccountOwnershipException` | Authenticated user does not own the debited source account |
 | `404 Not Found` | `AccountNotFoundException` | Source or destination account UUID does not exist |
 | `409 Conflict` | `IdempotencyConflictException` | Idempotency key reused with different transfer parameters |
 | `409 Conflict` | `DataIntegrityViolationException` | Database unique constraint violation on `idempotency_key` |
+| `422 Unprocessable Content` | `AccountFrozenException` | Source or destination account is in `FROZEN` status |
+| `422 Unprocessable Content` | `AccountClosedException` | Source or destination account is in `CLOSED` status |
+| `422 Unprocessable Content` | `AccountStatusException` | Source or destination account is not in `ACTIVE` status |
 | `422 Unprocessable Content` | `InsufficientBalanceException` | Source account balance is less than transfer amount |
 | `500 Internal Server Error` | `UnbalancedLedgerException` | Total debits do not equal total credits |
 | `500 Internal Server Error` | Unhandled `Exception` | Internal system error |

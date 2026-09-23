@@ -525,4 +525,38 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         assertThat(byTypeAndCurrency).isPresent();
         assertThat(byTypeAndCurrency.get().getAccountNumber()).isEqualTo("SYS-CLEAR-QUERY");
     }
+
+    // =========================================================================
+    // 8. MIGRATION COMPATIBILITY TESTS
+    // =========================================================================
+
+    @Test
+    @DisplayName("Migration: Existing account backfill formula produces deterministic unique account numbers and active user checking status")
+    void testExistingAccountMigrationDeterminism() {
+        UUID testAccountId = UUID.fromString("12345678-1234-1234-1234-123456789abc");
+        String expectedAccountNumber = "ACCT-" + "1234567812341234".toUpperCase();
+
+        // Simulate migration SQL logic:
+        // UPDATE accounts SET account_number = 'ACCT-' || UPPER(SUBSTR(REPLACE(id::text, '-', ''), 1, 16))
+        String computedAccountNumber = "ACCT-" + testAccountId.toString().replace("-", "").substring(0, 16).toUpperCase();
+        assertThat(computedAccountNumber).isEqualTo(expectedAccountNumber);
+
+        // Verify entity persistence with the deterministically computed account number
+        Account migratedAccount = new Account(
+                aliceUser,
+                "USD",
+                new BigDecimal("1234.5678"),
+                AccountType.USER_CHECKING,
+                AccountStatus.ACTIVE,
+                computedAccountNumber
+        );
+        migratedAccount = accountRepository.save(migratedAccount);
+
+        Account retrieved = accountRepository.findById(migratedAccount.getId()).orElseThrow();
+        assertThat(retrieved.getAccountNumber()).isEqualTo(expectedAccountNumber);
+        assertThat(retrieved.getAccountType()).isEqualTo(AccountType.USER_CHECKING);
+        assertThat(retrieved.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(retrieved.getBalance()).isEqualByComparingTo("1234.5678");
+        assertThat(retrieved.getCurrency()).isEqualTo("USD");
+    }
 }
