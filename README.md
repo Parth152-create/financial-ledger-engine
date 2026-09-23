@@ -48,6 +48,7 @@ financial-ledger-engine/
 - [Account Model & Database Hardening (V2)](docs/ACCOUNT_MODEL.md)
 - [Transaction & Ledger Model Hardening (V3)](docs/TRANSACTION_MODEL.md)
 - [Database Integrity, Indexing & Ledger Immutability (V4)](docs/DATABASE_INTEGRITY.md)
+- [Account Management API Specification (V5)](docs/ACCOUNT_API.md)
 - [Transfer API Specification](docs/TRANSFER_API.md)
 - [Financial Reconciliation Architecture](docs/RECONCILIATION.md)
 - [Failure Handling & Resiliency](docs/FAILURE_HANDLING.md)

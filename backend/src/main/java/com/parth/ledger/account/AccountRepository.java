@@ -29,4 +29,12 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Account a WHERE a.id = :id AND a.user.id = :userId")
     boolean existsByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);
+
+    List<Account> findByUserIdAndAccountType(UUID userId, AccountType accountType);
+
+    List<Account> findByUserIdAndAccountTypeOrderByCreatedAtAsc(UUID userId, AccountType accountType);
+
+    Optional<Account> findByIdAndUserIdAndAccountType(UUID id, UUID userId, AccountType accountType);
+
+    Optional<Account> findByIdAndUserId(UUID id, UUID userId);
 }
