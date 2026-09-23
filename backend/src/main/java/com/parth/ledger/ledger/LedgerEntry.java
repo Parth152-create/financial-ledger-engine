@@ -43,6 +43,9 @@ public class LedgerEntry {
     @Column(name = "amount", nullable = false, precision = 19, scale = 4, updatable = false)
     private BigDecimal amount;
 
+    @Column(name = "currency", nullable = false, length = 3, updatable = false)
+    private String currency;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -54,16 +57,32 @@ public class LedgerEntry {
                        Account account,
                        LedgerEntryType entryType,
                        BigDecimal amount) {
+        this(transaction, account, entryType, amount, transaction != null ? transaction.getCurrency() : (account != null ? account.getCurrency() : null));
+    }
+
+    public LedgerEntry(Transaction transaction,
+                       Account account,
+                       LedgerEntryType entryType,
+                       BigDecimal amount,
+                       String currency) {
         this.transaction = transaction;
         this.account = account;
         this.entryType = entryType;
         this.amount = amount;
+        this.currency = currency != null ? currency.trim().toUpperCase(java.util.Locale.ROOT) : null;
     }
 
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
+        }
+        if (this.currency == null) {
+            if (this.transaction != null) {
+                this.currency = this.transaction.getCurrency();
+            } else if (this.account != null) {
+                this.currency = this.account.getCurrency();
+            }
         }
     }
 
@@ -85,6 +104,10 @@ public class LedgerEntry {
 
     public BigDecimal getAmount() {
         return amount;
+    }
+
+    public String getCurrency() {
+        return currency;
     }
 
     public Instant getCreatedAt() {
@@ -112,6 +135,7 @@ public class LedgerEntry {
                 ", accountId=" + (account != null ? account.getId() : null) +
                 ", entryType=" + entryType +
                 ", amount=" + amount +
+                ", currency='" + currency + '\'' +
                 ", createdAt=" + createdAt +
                 '}';
     }

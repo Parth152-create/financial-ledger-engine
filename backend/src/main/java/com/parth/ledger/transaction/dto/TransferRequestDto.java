@@ -23,6 +23,12 @@ public record TransferRequestDto(
 
         @NotBlank(message = "currency is required")
         @Size(min = 3, max = 3, message = "currency must be a 3-character ISO code")
-        String currency
+        String currency,
+
+        @Size(max = 255, message = "description cannot exceed 255 characters")
+        String description
 ) {
+    public TransferRequestDto(UUID sourceAccountId, UUID destinationAccountId, BigDecimal amount, String currency) {
+        this(sourceAccountId, destinationAccountId, amount, currency, null);
+    }
 }

@@ -28,7 +28,8 @@ Executes a balance transfer between a source account and a destination account w
   "sourceAccountId": "c0a80123-0000-0000-0000-000000000001",
   "destinationAccountId": "c0a80123-0000-0000-0000-000000000002",
   "amount": 100.0000,
-  "currency": "USD"
+  "currency": "USD",
+  "description": "Invoice payment #4092"
 }
 ```
 
@@ -40,6 +41,7 @@ Executes a balance transfer between a source account and a destination account w
 | `destinationAccountId` | `UUID` | Required, Not Null | ID of the credited account (must differ from `sourceAccountId`) |
 | `amount` | `BigDecimal` | Required, > 0.0000, max 4 decimal digits | Transfer amount in account currency |
 | `currency` | `string` | Required, 3-letter ISO code (e.g. `USD`) | Currency code; must match both accounts |
+| `description` | `string` | Optional, max 255 chars | Human-readable memo or reference |
 
 ---
 
@@ -56,7 +58,10 @@ Executes a balance transfer between a source account and a destination account w
   "amount": 100.0000,
   "currency": "USD",
   "createdAt": "2026-09-22T11:45:00.123456Z",
-  "completedAt": "2026-09-22T11:45:00.145678Z"
+  "completedAt": "2026-09-22T11:45:00.145678Z",
+  "transactionType": "TRANSFER",
+  "initiatedByUserId": "c0a80123-9999-0000-0000-000000000001",
+  "description": "Invoice payment #4092"
 }
 ```
 

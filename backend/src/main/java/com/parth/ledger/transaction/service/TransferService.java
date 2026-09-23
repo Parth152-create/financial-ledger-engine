@@ -15,6 +15,7 @@ import com.parth.ledger.ledger.LedgerEntryType;
 import com.parth.ledger.transaction.Transaction;
 import com.parth.ledger.transaction.TransactionRepository;
 import com.parth.ledger.transaction.TransactionStatus;
+import com.parth.ledger.transaction.TransactionType;
 import com.parth.ledger.transaction.dto.TransferRequestDto;
 import com.parth.ledger.transaction.dto.TransferResponseDto;
 import com.parth.ledger.transaction.exception.CurrencyMismatchException;
@@ -37,6 +38,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -115,6 +117,7 @@ public class TransferService {
         // Standardize scale to 4 decimal places matching PostgreSQL NUMERIC(19,4)
         BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
         String currency = request.currency().trim().toUpperCase();
+        String cleanDescription = (request.description() != null && !request.description().isBlank()) ? request.description().trim() : null;
 
         // 5. Resolve authenticated application user from SecurityContext
         User authenticatedUser = authenticatedUserService.getCurrentUser();
@@ -134,8 +137,9 @@ public class TransferService {
             boolean sameDest = cached.destinationAccountId().equals(request.destinationAccountId());
             boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
             boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
+            boolean sameDesc = Objects.equals(cached.description(), cleanDescription);
 
-            if (sameSource && sameDest && sameAmount && sameCurrency) {
+            if (sameSource && sameDest && sameAmount && sameCurrency && sameDesc) {
                 // Verify source account ownership on Redis fast-path hit
                 if (!accountRepository.existsByIdAndUserId(request.sourceAccountId(), authenticatedUser.getId())) {
                     log.warn("Unauthorized attempt to access cached transfer for source account {} by user {}",
@@ -146,16 +150,18 @@ public class TransferService {
                         cleanIdempotencyKey, cached.transactionId());
                 return cached;
             } else {
-                log.warn("Idempotency conflict detected in Redis cache for key '{}'. Cached: [source={}, dest={}, amount={}, currency={}], Request: [source={}, dest={}, amount={}, currency={}]",
+                log.warn("Idempotency conflict detected in Redis cache for key '{}'. Cached: [source={}, dest={}, amount={}, currency={}, desc={}], Request: [source={}, dest={}, amount={}, currency={}, desc={}]",
                         cleanIdempotencyKey,
                         cached.sourceAccountId(),
                         cached.destinationAccountId(),
                         cached.amount(),
                         cached.currency(),
+                        cached.description(),
                         request.sourceAccountId(),
                         request.destinationAccountId(),
                         scaledAmount,
-                        currency);
+                        currency,
+                        cleanDescription);
                 throw new IdempotencyConflictException(
                         "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transfer with different parameters"
                 );
@@ -165,7 +171,7 @@ public class TransferService {
         // 6. Pre-lock Idempotency Check: Fast return for committed retries or conflict detection
         Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
         if (existingTx.isPresent()) {
-            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanIdempotencyKey, authenticatedUser);
+            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
         }
 
         // 8. Deterministic Lock Ordering:
@@ -200,7 +206,7 @@ public class TransferService {
         // thread committed the transaction to avoid duplicate transfers.
         Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
         if (txAfterLock.isPresent()) {
-            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanIdempotencyKey, authenticatedUser);
+            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
         }
 
         // Account Type Validation:
@@ -286,7 +292,10 @@ public class TransferService {
                 currency,
                 TransactionStatus.PENDING,
                 sourceAccount,
-                destinationAccount
+                destinationAccount,
+                TransactionType.TRANSFER,
+                authenticatedUser,
+                cleanDescription
         );
         transaction = transactionRepository.save(transaction);
 
@@ -295,13 +304,15 @@ public class TransferService {
                 transaction,
                 sourceAccount,
                 LedgerEntryType.DEBIT,
-                scaledAmount
+                scaledAmount,
+                currency
         );
         LedgerEntry creditEntry = new LedgerEntry(
                 transaction,
                 destinationAccount,
                 LedgerEntryType.CREDIT,
-                scaledAmount
+                scaledAmount,
+                currency
         );
 
         ledgerEntryRepository.save(debitEntry);
@@ -358,6 +369,7 @@ public class TransferService {
             TransferRequestDto request,
             BigDecimal scaledAmount,
             String currency,
+            String cleanDescription,
             String idempotencyKey,
             User authenticatedUser) {
 
@@ -365,8 +377,9 @@ public class TransferService {
         boolean sameDest = existing.getDestinationAccount().getId().equals(request.destinationAccountId());
         boolean sameAmount = existing.getAmount().compareTo(scaledAmount) == 0;
         boolean sameCurrency = existing.getCurrency().equalsIgnoreCase(currency);
+        boolean sameDesc = Objects.equals(existing.getDescription(), cleanDescription);
 
-        if (sameSource && sameDest && sameAmount && sameCurrency) {
+        if (sameSource && sameDest && sameAmount && sameCurrency && sameDesc) {
             // Verify source account ownership on database idempotency retry
             if (existing.getSourceAccount().getUser() == null || !existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
                 log.warn("Unauthorized attempt to access existing transaction {} for source account {} by user {}",
@@ -384,16 +397,18 @@ public class TransferService {
             }
             return response;
         } else {
-            log.warn("Idempotency conflict for key '{}'. Existing: [source={}, dest={}, amount={}, currency={}], Request: [source={}, dest={}, amount={}, currency={}]",
+            log.warn("Idempotency conflict for key '{}'. Existing: [source={}, dest={}, amount={}, currency={}, desc={}], Request: [source={}, dest={}, amount={}, currency={}, desc={}]",
                     idempotencyKey,
                     existing.getSourceAccount().getId(),
                     existing.getDestinationAccount().getId(),
                     existing.getAmount(),
                     existing.getCurrency(),
+                    existing.getDescription(),
                     request.sourceAccountId(),
                     request.destinationAccountId(),
                     scaledAmount,
-                    currency);
+                    currency,
+                    cleanDescription);
             throw new IdempotencyConflictException(
                     "Idempotency key '" + idempotencyKey + "' was already used for a transfer with different parameters"
             );
