@@ -1,8 +1,14 @@
 package com.parth.ledger.transaction.service;
 
 import com.parth.ledger.account.Account;
+import com.parth.ledger.account.AccountClosedException;
+import com.parth.ledger.account.AccountFrozenException;
 import com.parth.ledger.account.AccountNotFoundException;
 import com.parth.ledger.account.AccountRepository;
+import com.parth.ledger.account.AccountStatus;
+import com.parth.ledger.account.AccountStatusException;
+import com.parth.ledger.account.AccountType;
+import com.parth.ledger.account.InvalidAccountTypeException;
 import com.parth.ledger.ledger.LedgerEntry;
 import com.parth.ledger.ledger.LedgerEntryRepository;
 import com.parth.ledger.ledger.LedgerEntryType;
@@ -197,13 +203,53 @@ public class TransferService {
             return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanIdempotencyKey, authenticatedUser);
         }
 
+        // Account Type Validation:
+        // User transfers can strictly only occur between USER_CHECKING accounts.
+        // System clearing accounts must NOT be transferred via the user transfer endpoint.
+        if (sourceAccount.getAccountType() != AccountType.USER_CHECKING) {
+            log.warn("Transfer rejected: source account {} has ineligible type {}", sourceId, sourceAccount.getAccountType());
+            throw new InvalidAccountTypeException("Source account must be a USER_CHECKING account: " + sourceId);
+        }
+        if (destinationAccount.getAccountType() != AccountType.USER_CHECKING) {
+            log.warn("Transfer rejected: destination account {} has ineligible type {}", destinationId, destinationAccount.getAccountType());
+            throw new InvalidAccountTypeException("Destination account must be a USER_CHECKING account: " + destinationId);
+        }
+
         // 9. Source Account Ownership Authorization:
         // Verify that the authenticated application user is the owner of the source account being debited.
         // This check occurs while holding the pessimistic write lock on the source account to eliminate TOCTOU races.
-        if (!sourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
+        if (sourceAccount.getUser() == null || !sourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
             log.warn("Unauthorized transfer: user {} does not own source account {}",
                     authenticatedUser.getId(), sourceId);
             throw new AccountOwnershipException("Authenticated user does not own source account");
+        }
+
+        // Account Status Validation:
+        // Ensure both source and destination accounts are ACTIVE. Transfers fail if FROZEN or CLOSED.
+        if (sourceAccount.getStatus() == AccountStatus.FROZEN) {
+            log.warn("Transfer rejected: source account {} is FROZEN", sourceId);
+            throw new AccountFrozenException("Source account " + sourceId + " is FROZEN");
+        }
+        if (sourceAccount.getStatus() == AccountStatus.CLOSED) {
+            log.warn("Transfer rejected: source account {} is CLOSED", sourceId);
+            throw new AccountClosedException("Source account " + sourceId + " is CLOSED");
+        }
+        if (sourceAccount.getStatus() != AccountStatus.ACTIVE) {
+            log.warn("Transfer rejected: source account {} is in status {}", sourceId, sourceAccount.getStatus());
+            throw new AccountStatusException("Source account " + sourceId + " is not ACTIVE");
+        }
+
+        if (destinationAccount.getStatus() == AccountStatus.FROZEN) {
+            log.warn("Transfer rejected: destination account {} is FROZEN", destinationId);
+            throw new AccountFrozenException("Destination account " + destinationId + " is FROZEN");
+        }
+        if (destinationAccount.getStatus() == AccountStatus.CLOSED) {
+            log.warn("Transfer rejected: destination account {} is CLOSED", destinationId);
+            throw new AccountClosedException("Destination account " + destinationId + " is CLOSED");
+        }
+        if (destinationAccount.getStatus() != AccountStatus.ACTIVE) {
+            log.warn("Transfer rejected: destination account {} is in status {}", destinationId, destinationAccount.getStatus());
+            throw new AccountStatusException("Destination account " + destinationId + " is not ACTIVE");
         }
 
         // 2 & 5. Validate currency compatibility
@@ -322,7 +368,7 @@ public class TransferService {
 
         if (sameSource && sameDest && sameAmount && sameCurrency) {
             // Verify source account ownership on database idempotency retry
-            if (!existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
+            if (existing.getSourceAccount().getUser() == null || !existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
                 log.warn("Unauthorized attempt to access existing transaction {} for source account {} by user {}",
                         existing.getId(), existing.getSourceAccount().getId(), authenticatedUser.getId());
                 throw new AccountOwnershipException("Authenticated user does not own source account");

@@ -1,6 +1,8 @@
 package com.parth.ledger.common.exception;
 
 import com.parth.ledger.account.AccountNotFoundException;
+import com.parth.ledger.account.AccountStatusException;
+import com.parth.ledger.account.InvalidAccountTypeException;
 import com.parth.ledger.transaction.exception.CurrencyMismatchException;
 import com.parth.ledger.transaction.exception.IdempotencyConflictException;
 import com.parth.ledger.transaction.exception.InsufficientBalanceException;
@@ -52,6 +54,30 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
+    }
+
+    @ExceptionHandler(AccountStatusException.class)
+    public ResponseEntity<ErrorResponse> handleAccountStatus(AccountStatusException ex, HttpServletRequest request) {
+        log.warn("Account status invalid for operation on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.UNPROCESSABLE_CONTENT.value(),
+                HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
+    }
+
+    @ExceptionHandler(InvalidAccountTypeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAccountType(InvalidAccountTypeException ex, HttpServletRequest request) {
+        log.warn("Invalid account type for operation on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(SameAccountTransferException.class)

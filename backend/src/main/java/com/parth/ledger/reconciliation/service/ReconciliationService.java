@@ -66,7 +66,7 @@ public class ReconciliationService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
 
-        if (!account.getUser().getId().equals(currentUser.getId())) {
+        if (account.getUser() == null || !account.getUser().getId().equals(currentUser.getId())) {
             log.warn("Unauthorized reconciliation attempt: user {} does not own account {}",
                     currentUser.getId(), accountId);
             throw new AccountOwnershipException("Authenticated user does not own account: " + accountId);
