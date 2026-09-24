@@ -19,7 +19,8 @@ public abstract class BaseIntegrationTest {
     protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("ledger_test")
             .withUsername("ledger_user")
-            .withPassword("ledger_pass");
+            .withPassword("ledger_pass")
+            .withCommand("postgres", "-c", "max_connections=300");
 
     protected static final GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(6379);
