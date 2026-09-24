@@ -1,5 +1,6 @@
 package com.parth.ledger.idempotency;
 
+import com.parth.ledger.transaction.dto.TransactionResponseDto;
 import com.parth.ledger.transaction.dto.TransferResponseDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,13 +38,15 @@ public class IdempotencyCacheService {
     }
 
     /**
-     * Retrieves a cached transfer response from Redis fast-path.
+     * Retrieves a cached response from Redis fast-path deserialized to the target class.
      * Fails open on any Redis or deserialization exception, returning Optional.empty().
      *
      * @param idempotencyKey Client idempotency key.
-     * @return Optional containing the cached TransferResponseDto, or empty if missed or Redis failed.
+     * @param responseType Expected DTO class.
+     * @param <T> DTO type.
+     * @return Optional containing the cached DTO, or empty if missed or Redis failed.
      */
-    public Optional<TransferResponseDto> get(String idempotencyKey) {
+    public <T> Optional<T> get(String idempotencyKey, Class<T> responseType) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return Optional.empty();
         }
@@ -53,13 +56,24 @@ public class IdempotencyCacheService {
             if (json == null || json.isBlank()) {
                 return Optional.empty();
             }
-            TransferResponseDto dto = objectMapper.readValue(json, TransferResponseDto.class);
+            T dto = objectMapper.readValue(json, responseType);
             return Optional.ofNullable(dto);
         } catch (Exception e) {
             log.warn("Redis error while retrieving idempotency key '{}': {}. Falling back to PostgreSQL.",
                     redisKey, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    /**
+     * Retrieves a cached transfer response from Redis fast-path.
+     * Fails open on any Redis or deserialization exception, returning Optional.empty().
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @return Optional containing the cached TransferResponseDto, or empty if missed or Redis failed.
+     */
+    public Optional<TransferResponseDto> get(String idempotencyKey) {
+        return get(idempotencyKey, TransferResponseDto.class);
     }
 
     /**
@@ -91,6 +105,39 @@ public class IdempotencyCacheService {
             log.debug("Cached transfer response in Redis for key '{}' with TTL {}", redisKey, ttl);
         } catch (Exception e) {
             log.warn("Redis error while caching idempotency key '{}': {}. Transfer remains committed in PostgreSQL.",
+                    redisKey, e.getMessage());
+        }
+    }
+
+    /**
+     * Caches a successfully committed transaction response with the default configured TTL.
+     * Fails open so Redis errors never rollback or fail a committed transaction.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param responseDto Transaction response to cache.
+     */
+    public void set(String idempotencyKey, TransactionResponseDto responseDto) {
+        set(idempotencyKey, responseDto, this.defaultTtl);
+    }
+
+    /**
+     * Caches a successfully committed transaction response with a specific custom TTL.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param responseDto Transaction response to cache.
+     * @param ttl Custom time-to-live duration.
+     */
+    public void set(String idempotencyKey, TransactionResponseDto responseDto, Duration ttl) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || responseDto == null) {
+            return;
+        }
+        String redisKey = buildKey(idempotencyKey);
+        try {
+            String json = objectMapper.writeValueAsString(responseDto);
+            redisTemplate.opsForValue().set(redisKey, json, ttl);
+            log.debug("Cached transaction response in Redis for key '{}' with TTL {}", redisKey, ttl);
+        } catch (Exception e) {
+            log.warn("Redis error while caching idempotency key '{}': {}. Transaction remains committed in PostgreSQL.",
                     redisKey, e.getMessage());
         }
     }

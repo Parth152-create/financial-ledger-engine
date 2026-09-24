@@ -76,6 +76,25 @@ public class ReconciliationService {
     }
 
     /**
+     * Reconciles an individual account directly without ownership validation.
+     * Used for internal platform integrity checks (e.g. SYSTEM_CLEARING).
+     *
+     * @param accountId Unique identifier of the account to reconcile.
+     * @return ReconciliationResultDto with snapshot, ledger balance, difference, and consistency status.
+     * @throws AccountNotFoundException if the account does not exist.
+     */
+    public ReconciliationResultDto reconcileAccountDirectly(UUID accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("Account ID must not be null");
+        }
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+        return calculateReconciliation(account);
+    }
+
+    /**
      * Reconciles all accounts owned by the currently authenticated user.
      *
      * @return OverallReconciliationDto summarizing total, consistent, and discrepancy counts.
