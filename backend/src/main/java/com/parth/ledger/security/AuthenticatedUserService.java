@@ -71,4 +71,18 @@ public class AuthenticatedUserService {
 
         throw new AuthenticationCredentialsNotFoundException("Unable to resolve authenticated user from SecurityContext");
     }
+
+    /**
+     * Checks if the currently authenticated user possesses administrative authority (ROLE_ADMIN).
+     *
+     * @return true if the user has ROLE_ADMIN, false otherwise.
+     */
+    public boolean isAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority()));
+    }
 }

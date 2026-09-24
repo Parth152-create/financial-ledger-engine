@@ -122,4 +122,146 @@ public class AccountService {
 
         return AccountResponseDto.from(account);
     }
+
+    /**
+     * Freezes a USER_CHECKING account under pessimistic row-level lock.
+     * Administrative operation: requires ROLE_ADMIN authority.
+     *
+     * State transitions:
+     * - ACTIVE -> FROZEN: 200 OK (updated status)
+     * - FROZEN -> FROZEN: 200 OK (idempotent no-op)
+     * - CLOSED -> FROZEN: 422 Unprocessable Content (AccountClosedException)
+     * - SYSTEM_CLEARING: 400 Bad Request (InvalidAccountTypeException)
+     */
+    @Transactional
+    public AccountResponseDto freezeAccount(UUID accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("Account ID must not be null");
+        }
+        if (!authenticatedUserService.isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Administrative privileges required to freeze account");
+        }
+
+        Account account = accountRepository.findByIdForUpdate(accountId)
+                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+        if (account.getAccountType() != AccountType.USER_CHECKING) {
+            throw new InvalidAccountTypeException("Only USER_CHECKING accounts can be frozen: " + accountId);
+        }
+
+        if (account.getStatus() == AccountStatus.CLOSED) {
+            throw new AccountClosedException("Cannot freeze CLOSED account: " + accountId);
+        }
+
+        if (account.getStatus() == AccountStatus.FROZEN) {
+            log.info("Account {} is already FROZEN. Returning current representation.", accountId);
+            return AccountResponseDto.from(account);
+        }
+
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountStatusException("Cannot freeze account in status: " + account.getStatus());
+        }
+
+        account.setStatus(AccountStatus.FROZEN);
+        Account saved = accountRepository.save(account);
+        log.info("Account {} successfully frozen by admin", accountId);
+
+        return AccountResponseDto.from(saved);
+    }
+
+    /**
+     * Unfreezes a USER_CHECKING account under pessimistic row-level lock.
+     * Administrative operation: requires ROLE_ADMIN authority.
+     *
+     * State transitions:
+     * - FROZEN -> ACTIVE: 200 OK (updated status)
+     * - ACTIVE -> ACTIVE: 422 Unprocessable Content (AccountStatusException)
+     * - CLOSED -> ACTIVE: 422 Unprocessable Content (AccountClosedException)
+     * - SYSTEM_CLEARING: 400 Bad Request (InvalidAccountTypeException)
+     */
+    @Transactional
+    public AccountResponseDto unfreezeAccount(UUID accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("Account ID must not be null");
+        }
+        if (!authenticatedUserService.isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Administrative privileges required to unfreeze account");
+        }
+
+        Account account = accountRepository.findByIdForUpdate(accountId)
+                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+        if (account.getAccountType() != AccountType.USER_CHECKING) {
+            throw new InvalidAccountTypeException("Only USER_CHECKING accounts can be unfrozen: " + accountId);
+        }
+
+        if (account.getStatus() == AccountStatus.CLOSED) {
+            throw new AccountClosedException("Cannot unfreeze CLOSED account: " + accountId);
+        }
+
+        if (account.getStatus() == AccountStatus.ACTIVE) {
+            throw new AccountStatusException("Account is already ACTIVE: " + accountId);
+        }
+
+        if (account.getStatus() != AccountStatus.FROZEN) {
+            throw new AccountStatusException("Cannot unfreeze account in status: " + account.getStatus());
+        }
+
+        account.setStatus(AccountStatus.ACTIVE);
+        Account saved = accountRepository.save(account);
+        log.info("Account {} successfully unfrozen by admin", accountId);
+
+        return AccountResponseDto.from(saved);
+    }
+
+    /**
+     * Closes an authenticated user's USER_CHECKING account under pessimistic row-level lock.
+     * Owner-level operation: user must own the account.
+     * Foreign, system, or nonexistent accounts return 404 Not Found for anti-enumeration protection.
+     *
+     * State transitions:
+     * - ACTIVE + balance == 0 -> CLOSED: 200 OK
+     * - FROZEN + balance == 0 -> CLOSED: 200 OK
+     * - ACTIVE + balance > 0 -> 422 Unprocessable Content (AccountStatusException)
+     * - FROZEN + balance > 0 -> 422 Unprocessable Content (AccountStatusException)
+     * - CLOSED -> CLOSED: 200 OK (idempotent no-op)
+     * - SYSTEM_CLEARING: 404 Not Found
+     */
+    @Transactional
+    public AccountResponseDto closeAccount(UUID accountId) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("Account ID must not be null");
+        }
+
+        User currentUser = authenticatedUserService.getCurrentUser();
+
+        Account account = accountRepository.findByIdForUpdate(accountId)
+                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+        // Enforce ownership boundary & account type isolation
+        if (account.getAccountType() != AccountType.USER_CHECKING ||
+                account.getUser() == null ||
+                !account.getUser().getId().equals(currentUser.getId())) {
+            log.warn("Account {} not found or unauthorized for user {}", accountId, currentUser.getId());
+            throw new AccountNotFoundException("Account not found: " + accountId);
+        }
+
+        // Idempotent return if already CLOSED
+        if (account.getStatus() == AccountStatus.CLOSED) {
+            log.info("Account {} is already CLOSED. Returning current representation.", accountId);
+            return AccountResponseDto.from(account);
+        }
+
+        // Enforce zero-balance invariant
+        if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {
+            log.warn("Cannot close account {} with non-zero balance: {}", accountId, account.getBalance());
+            throw new AccountStatusException("Cannot close account with non-zero balance: " + account.getBalance());
+        }
+
+        account.setStatus(AccountStatus.CLOSED);
+        Account saved = accountRepository.save(account);
+        log.info("Account {} successfully closed by owner {}", accountId, currentUser.getId());
+
+        return AccountResponseDto.from(saved);
+    }
 }

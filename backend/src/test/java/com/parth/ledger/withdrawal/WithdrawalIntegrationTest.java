@@ -644,7 +644,6 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("22. Closed account rejects withdrawal with 422 Unprocessable Entity")
         void closedAccountRejectsWithdrawal() throws Exception {
-            fundAccount(aliceUser, aliceAccount, new BigDecimal("500.0000"));
             Account reloaded = accountRepository.findById(aliceAccount.getId()).orElseThrow();
             reloaded.setStatus(AccountStatus.CLOSED);
             accountRepository.save(reloaded);

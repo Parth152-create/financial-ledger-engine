@@ -68,4 +68,40 @@ public class AccountController {
         AccountResponseDto account = accountService.getAccount(accountId);
         return ResponseEntity.ok(account);
     }
+
+    /**
+     * Freezes a USER_CHECKING account. Administrative operation (requires ROLE_ADMIN).
+     *
+     * @param accountId Unique identifier of the account to freeze.
+     * @return 200 OK with AccountResponseDto.
+     */
+    @PostMapping("/{accountId}/freeze")
+    public ResponseEntity<AccountResponseDto> freezeAccount(@PathVariable("accountId") UUID accountId) {
+        AccountResponseDto response = accountService.freezeAccount(accountId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Unfreezes a USER_CHECKING account. Administrative operation (requires ROLE_ADMIN).
+     *
+     * @param accountId Unique identifier of the account to unfreeze.
+     * @return 200 OK with AccountResponseDto.
+     */
+    @PostMapping("/{accountId}/unfreeze")
+    public ResponseEntity<AccountResponseDto> unfreezeAccount(@PathVariable("accountId") UUID accountId) {
+        AccountResponseDto response = accountService.unfreezeAccount(accountId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Closes an authenticated user's USER_CHECKING account. Owner-level operation.
+     *
+     * @param accountId Unique identifier of the account to close.
+     * @return 200 OK with AccountResponseDto.
+     */
+    @PostMapping("/{accountId}/close")
+    public ResponseEntity<AccountResponseDto> closeAccount(@PathVariable("accountId") UUID accountId) {
+        AccountResponseDto response = accountService.closeAccount(accountId);
+        return ResponseEntity.ok(response);
+    }
 }

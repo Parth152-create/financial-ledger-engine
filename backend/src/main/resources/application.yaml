@@ -44,6 +44,8 @@ spring:
 ledger:
   idempotency:
     ttl-seconds: ${LEDGER_IDEMPOTENCY_TTL_SECONDS:86400}
+  security:
+    admin-emails: ${LEDGER_ADMIN_EMAILS:admin@ledger.com}
 
 management:
   endpoints:

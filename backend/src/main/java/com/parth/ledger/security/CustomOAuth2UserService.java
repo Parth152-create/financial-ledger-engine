@@ -4,12 +4,20 @@ import com.parth.ledger.user.User;
 import com.parth.ledger.user.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Custom OAuth2 user service that loads user information from the OAuth2 provider
@@ -21,9 +29,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private static final Logger log = LoggerFactory.getLogger(CustomOAuth2UserService.class);
 
     private final UserService userService;
+    private final List<String> adminEmails;
 
-    public CustomOAuth2UserService(UserService userService) {
+    public CustomOAuth2UserService(
+            UserService userService,
+            @Value("${ledger.security.admin-emails:admin@ledger.com}") String adminEmailsConfig) {
         this.userService = userService;
+        this.adminEmails = adminEmailsConfig != null
+                ? Arrays.stream(adminEmailsConfig.split(",")).map(String::trim).map(String::toLowerCase).toList()
+                : List.of("admin@ledger.com");
     }
 
     @Override
@@ -45,6 +59,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             userNameAttributeName = "email";
         }
 
-        return new CustomOAuth2User(oauth2User.getAuthorities(), oauth2User.getAttributes(), userNameAttributeName, user);
+        Set<GrantedAuthority> authorities = new HashSet<>(oauth2User.getAuthorities());
+        if (adminEmails.contains(email.trim().toLowerCase())) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
+
+        return new CustomOAuth2User(authorities, oauth2User.getAttributes(), userNameAttributeName, user);
     }
 }

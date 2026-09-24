@@ -173,6 +173,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         assertThat(frozen.isFrozen()).isTrue();
         assertThat(frozen.isActive()).isFalse();
 
+        frozen.setBalance(BigDecimal.ZERO.setScale(4));
         frozen.setStatus(AccountStatus.CLOSED);
         frozen = accountRepository.save(frozen);
 
@@ -381,6 +382,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Transfer status: Rejects transfer when source account is CLOSED (422)")
     void transferFailsWhenSourceAccountIsClosed() throws Exception {
+        aliceAccount.setBalance(BigDecimal.ZERO.setScale(4));
         aliceAccount.setStatus(AccountStatus.CLOSED);
         accountRepository.save(aliceAccount);
 
@@ -401,7 +403,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
 
         // Balances remain intact
         assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
-                .isEqualByComparingTo("1000.0000");
+                .isEqualByComparingTo("0.0000");
         assertThat(accountRepository.findById(bobAccount.getId()).orElseThrow().getBalance())
                 .isEqualByComparingTo("500.0000");
         assertThat(transactionRepository.count()).isZero();
@@ -411,6 +413,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Transfer status: Rejects transfer when destination account is CLOSED (422)")
     void transferFailsWhenDestinationAccountIsClosed() throws Exception {
+        bobAccount.setBalance(BigDecimal.ZERO.setScale(4));
         bobAccount.setStatus(AccountStatus.CLOSED);
         accountRepository.save(bobAccount);
 
@@ -433,7 +436,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                 .isEqualByComparingTo("1000.0000");
         assertThat(accountRepository.findById(bobAccount.getId()).orElseThrow().getBalance())
-                .isEqualByComparingTo("500.0000");
+                .isEqualByComparingTo("0.0000");
         assertThat(transactionRepository.count()).isZero();
         assertThat(ledgerEntryRepository.count()).isZero();
     }
