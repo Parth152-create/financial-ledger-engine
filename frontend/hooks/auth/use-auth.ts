@@ -23,6 +23,22 @@ export function useAuth() {
     window.location.href = authApi.getGoogleOAuthUrl()
   }
 
+  const loginWithEmail = async (email: string, password: string): Promise<User> => {
+    const authenticatedUser = await authApi.login({ email, password })
+    queryClient.setQueryData(AUTH_QUERY_KEY, authenticatedUser)
+    await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
+    router.push(ROUTES.DASHBOARD)
+    return authenticatedUser
+  }
+
+  const signupWithEmail = async (name: string, email: string, password: string): Promise<User> => {
+    const createdUser = await authApi.signup({ name, email, password })
+    queryClient.setQueryData(AUTH_QUERY_KEY, createdUser)
+    await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
+    router.push(ROUTES.DASHBOARD)
+    return createdUser
+  }
+
   const logout = async () => {
     try {
       await authApi.logout()
@@ -42,6 +58,8 @@ export function useAuth() {
     error,
     refetch,
     loginWithGoogle,
+    loginWithEmail,
+    signupWithEmail,
     logout,
   }
 }

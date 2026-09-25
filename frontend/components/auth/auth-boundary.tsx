@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useAuth } from "@/hooks/auth/use-auth"
 import { AppShell } from "@/components/layout/app-shell"
 import { Lock, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ROUTES } from "@/constants/routes"
 
 export function AuthBoundary({ children }: { children: React.ReactNode }) {
   const { user, isLoading, error, loginWithGoogle } = useAuth()
@@ -46,18 +48,30 @@ export function AuthBoundary({ children }: { children: React.ReactNode }) {
             Access to financial accounts and transaction journals requires an authenticated session.
           </p>
 
-          <Button
-            type="button"
-            onClick={loginWithGoogle}
-            className="w-full h-8.5 justify-center gap-2 text-xs font-sans"
-          >
-            <span>Continue with Google</span>
-            <ArrowRight className="size-3.5" />
-          </Button>
+          <div className="space-y-2.5">
+            <Link href={ROUTES.LOGIN} className="block w-full">
+              <Button
+                type="button"
+                className="w-full h-8.5 justify-center gap-2 text-[13px] font-sans"
+              >
+                <span>Sign in with Email</span>
+                <ArrowRight className="size-3.5" />
+              </Button>
+            </Link>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={loginWithGoogle}
+              className="w-full h-8.5 justify-center gap-2 text-[13px] font-sans"
+            >
+              <span>Continue with Google</span>
+            </Button>
+          </div>
 
           <div className="mt-5 pt-3 border-t border-border/50 text-center">
-            <span className="text-[11px] text-muted-foreground font-sans">
-              Google OAuth · Session-based authentication
+            <span className="text-[11.5px] text-muted-foreground font-sans">
+              Google OAuth · Email & Password · Session-based
             </span>
           </div>
         </div>

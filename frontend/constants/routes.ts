@@ -14,6 +14,9 @@ export const ROUTES = {
 
 export const API_ROUTES = {
   AUTH_ME: "/api/v1/auth/me",
+  AUTH_LOGIN: "/api/v1/auth/login",
+  AUTH_SIGNUP: "/api/v1/auth/signup",
+  AUTH_LINK_PASSWORD: "/api/v1/auth/link-password",
   OAUTH2_GOOGLE: "/oauth2/authorization/google",
   LOGOUT: "/logout",
   ACCOUNTS: "/api/v1/accounts",
