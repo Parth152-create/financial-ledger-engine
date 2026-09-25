@@ -1,0 +1,31 @@
+export const ROUTES = {
+  HOME: "/",
+  LOGIN: "/login",
+  SIGNUP: "/signup",
+  DASHBOARD: "/app",
+  ACCOUNTS: "/app/accounts",
+  ACCOUNT_DETAILS: (accountId: string) => `/app/accounts/${accountId}`,
+  TRANSFERS: "/app/transfers",
+  LEDGER: "/app/ledger",
+  ANALYTICS: "/app/analytics",
+  RECONCILIATION: "/app/reconciliation",
+  SETTINGS: "/app/settings",
+} as const
+
+export const API_ROUTES = {
+  AUTH_ME: "/api/v1/auth/me",
+  OAUTH2_GOOGLE: "/oauth2/authorization/google",
+  LOGOUT: "/logout",
+  ACCOUNTS: "/api/v1/accounts",
+  ACCOUNT_BY_ID: (id: string) => `/api/v1/accounts/${id}`,
+  ACCOUNT_FREEZE: (id: string) => `/api/v1/accounts/${id}/freeze`,
+  ACCOUNT_UNFREEZE: (id: string) => `/api/v1/accounts/${id}/unfreeze`,
+  ACCOUNT_CLOSE: (id: string) => `/api/v1/accounts/${id}/close`,
+  TRANSFERS: "/api/v1/transfers",
+  DEPOSITS: "/api/v1/deposits",
+  WITHDRAWALS: "/api/v1/withdrawals",
+  TRANSACTIONS: (accountId: string) => `/api/v1/accounts/${accountId}/transactions`,
+  STATEMENT: (accountId: string) => `/api/v1/accounts/${accountId}/statement`,
+  RECONCILIATION_OVERALL: "/api/v1/reconciliation",
+  RECONCILIATION_ACCOUNT: (accountId: string) => `/api/v1/reconciliation/accounts/${accountId}`,
+} as const

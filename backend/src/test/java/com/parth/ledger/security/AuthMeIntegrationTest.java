@@ -198,7 +198,7 @@ class AuthMeIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("8. OAuth login configuration starts correctly and configures default redirect to /api/v1/auth/me")
+    @DisplayName("8. OAuth login configuration starts correctly and configures default redirect to frontend /app")
     void oauthLoginConfigurationStartsCorrectly() throws Exception {
         // Verify OAuth2 authorization initiation endpoint starts and redirects to Google
         mockMvc.perform(get("/oauth2/authorization/google"))
@@ -222,19 +222,19 @@ class AuthMeIntegrationTest extends BaseIntegrationTest {
         Field defaultTargetUrlField = AbstractAuthenticationTargetUrlRequestHandler.class.getDeclaredField("defaultTargetUrl");
         defaultTargetUrlField.setAccessible(true);
         String defaultTargetUrl = (String) defaultTargetUrlField.get(successHandler);
-        assertThat(defaultTargetUrl).isEqualTo("/api/v1/auth/me");
+        assertThat(defaultTargetUrl).isEqualTo("http://localhost:3001/app");
 
         Field alwaysUseField = AbstractAuthenticationTargetUrlRequestHandler.class.getDeclaredField("alwaysUseDefaultTargetUrl");
         alwaysUseField.setAccessible(true);
         boolean alwaysUse = (boolean) alwaysUseField.get(successHandler);
         assertThat(alwaysUse).isTrue();
 
-        // Verify that invoking the success handler executes the redirect to /api/v1/auth/me
+        // Verify that invoking the success handler executes the redirect to frontend /app
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         Authentication auth = new UsernamePasswordAuthenticationToken("alice.auth@ledger.com", null, Collections.emptyList());
 
         successHandler.onAuthenticationSuccess(request, response, auth);
-        assertThat(response.getRedirectedUrl()).isEqualTo("/api/v1/auth/me");
+        assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:3001/app");
     }
 }

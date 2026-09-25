@@ -35,13 +35,16 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomOidcUserService customOidcUserService;
     private final String allowedOriginsConfig;
+    private final String frontendUrl;
 
     public SecurityConfig(CustomOAuth2UserService customOAuth2UserService,
                           CustomOidcUserService customOidcUserService,
-                          @Value("${ledger.security.cors.allowed-origins:http://localhost:3000}") String allowedOriginsConfig) {
+                          @Value("${ledger.security.cors.allowed-origins:http://localhost:3000,http://localhost:3001}") String allowedOriginsConfig,
+                          @Value("${ledger.frontend-url:http://localhost:3001}") String frontendUrl) {
         this.customOAuth2UserService = customOAuth2UserService;
         this.customOidcUserService = customOidcUserService;
         this.allowedOriginsConfig = allowedOriginsConfig;
+        this.frontendUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
     }
 
     @Bean
@@ -67,7 +70,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .defaultSuccessUrl("/api/v1/auth/me", true)
+                        .defaultSuccessUrl(frontendUrl + "/app", true)
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                                 .oidcUserService(customOidcUserService)
