@@ -91,7 +91,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("1. Authenticated user can create USER_CHECKING account")
     void authenticatedUserCanCreateAccount() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -102,7 +102,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.accountNumber", startsWith("ACCT-")))
                 .andExpect(jsonPath("$.accountType", is("USER_CHECKING")))
                 .andExpect(jsonPath("$.status", is("ACTIVE")))
-                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.currency", is("INR")))
                 .andExpect(jsonPath("$.balance", is(0.0)))
                 .andExpect(jsonPath("$.createdAt", notNullValue()))
                 .andExpect(jsonPath("$.updatedAt", notNullValue()));
@@ -111,7 +111,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("2. Created account balance starts strictly at zero")
     void createdBalanceIsZero() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -132,7 +132,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("3. Created account status starts strictly as ACTIVE")
     void createdAccountIsActive() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -152,7 +152,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("4. Created account has USER_CHECKING type")
     void createdAccountHasUserCheckingType() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -187,8 +187,8 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("6. Generated account numbers are unique across multiple creations")
     void accountNumberIsUnique() throws Exception {
-        CreateAccountRequestDto request1 = new CreateAccountRequestDto("USD");
-        CreateAccountRequestDto request2 = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request1 = new CreateAccountRequestDto("INR");
+        CreateAccountRequestDto request2 = new CreateAccountRequestDto("INR");
 
         String body1 = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -295,7 +295,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("10. Client cannot choose account type (always USER_CHECKING)")
     void clientCannotChooseAccountType() throws Exception {
-        String payload = "{\"currency\": \"USD\", \"accountType\": \"SYSTEM_CLEARING\"}";
+        String payload = "{\"currency\": \"INR\", \"accountType\": \"SYSTEM_CLEARING\"}";
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -308,7 +308,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("11. Client cannot choose initial balance (always zero)")
     void clientCannotChooseBalance() throws Exception {
-        String payload = "{\"currency\": \"USD\", \"balance\": 99999.0000}";
+        String payload = "{\"currency\": \"INR\", \"balance\": 99999.0000}";
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -321,7 +321,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("12. Client cannot choose status (always ACTIVE)")
     void clientCannotChooseStatus() throws Exception {
-        String payload = "{\"currency\": \"USD\", \"status\": \"CLOSED\"}";
+        String payload = "{\"currency\": \"INR\", \"status\": \"CLOSED\"}";
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -334,7 +334,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("13. Unauthenticated account creation returns HTTP 401 Unauthorized")
     void unauthenticatedCreationReturns401() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("USD");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         mockMvc.perform(post("/api/v1/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -349,21 +349,21 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("14. Authenticated user sees all their own accounts")
     void authenticatedUserSeesTheirOwnAccounts() throws Exception {
-        accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO));
+        accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
         accountRepository.save(new Account(aliceUser, "EUR", BigDecimal.ZERO));
 
         mockMvc.perform(get("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].currency", is("USD")))
+                .andExpect(jsonPath("$[0].currency", is("INR")))
                 .andExpect(jsonPath("$[1].currency", is("EUR")));
     }
 
     @Test
     @DisplayName("15. Authenticated user cannot see another user's accounts")
     void authenticatedUserCannotSeeAnotherUsersAccounts() throws Exception {
-        Account aliceAcc = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO));
+        Account aliceAcc = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
         Account bobAcc = accountRepository.save(new Account(bobUser, "EUR", BigDecimal.ZERO));
 
         // Alice's perspective
@@ -384,8 +384,8 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("16. SYSTEM_CLEARING accounts are strictly excluded from list endpoint")
     void systemClearingAccountIsExcludedFromList() throws Exception {
-        accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO));
-        accountRepository.save(Account.createSystemClearingAccount("USD", "ACCT-SYS-CLEAR-01"));
+        accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
+        accountRepository.save(Account.createSystemClearingAccount("INR", "ACCT-SYS-CLEAR-01"));
 
         mockMvc.perform(get("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com")))
@@ -411,7 +411,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("18. User can retrieve their own account by ID")
     void userCanRetrieveOwnAccount() throws Exception {
-        Account account = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO));
+        Account account = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
 
         mockMvc.perform(get("/api/v1/accounts/" + account.getId())
                         .with(user("alice.v5@ledger.com")))
@@ -420,14 +420,14 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.accountNumber", is(account.getAccountNumber())))
                 .andExpect(jsonPath("$.accountType", is("USER_CHECKING")))
                 .andExpect(jsonPath("$.status", is("ACTIVE")))
-                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.currency", is("INR")))
                 .andExpect(jsonPath("$.balance", is(0.0)));
     }
 
     @Test
     @DisplayName("19. User cannot retrieve another user's account (returns HTTP 404 Not Found)")
     void userCannotRetrieveAnotherUsersAccount() throws Exception {
-        Account bobAccount = accountRepository.save(new Account(bobUser, "USD", BigDecimal.ZERO));
+        Account bobAccount = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO));
 
         // Alice attempts to access Bob's account
         mockMvc.perform(get("/api/v1/accounts/" + bobAccount.getId())
@@ -439,7 +439,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("20. SYSTEM_CLEARING accounts are not exposed through single account endpoint")
     void systemClearingAccountIsNotExposed() throws Exception {
-        Account systemAccount = accountRepository.save(Account.createSystemClearingAccount("USD", "ACCT-SYS-CLEAR-02"));
+        Account systemAccount = accountRepository.save(Account.createSystemClearingAccount("INR", "ACCT-SYS-CLEAR-02"));
 
         mockMvc.perform(get("/api/v1/accounts/" + systemAccount.getId())
                         .with(user("alice.v5@ledger.com")))

@@ -218,8 +218,8 @@ The row-level lock serializes lifecycle transitions against all financial mutati
 | | `transfer` acquires lock first | Transfer succeeds, increasing balance $> 0$. Close wakes up, detects `balance > 0`, and is rejected with `422 Unprocessable Entity`. |
 | **Close + Deposit** | `close` acquires lock first | Account closed. Deposit wakes up, reads `CLOSED`, and is rejected with `422 Unprocessable Entity`. |
 | | `deposit` acquires lock first | Deposit succeeds, increasing balance $> 0$. Close wakes up, detects `balance > 0`, and is rejected with `422 Unprocessable Entity`. |
-| **Close + Withdrawal (Exact Balance)** | `close` acquires lock first ($100 bal) | Close evaluates balance ($100 != 0) and is rejected with `422`. Withdrawal wakes up and debits $100 to reach 0. |
-| | `withdrawal` acquires lock first ($100 bal) | Withdrawal debits $100 to balance 0. Close wakes up, observes balance == 0, and closes successfully. |
+| **Close + Withdrawal (Exact Balance)** | `close` acquires lock first (INR 100.00 bal) | Close evaluates balance (INR 100.00 != 0) and is rejected with `422`. Withdrawal wakes up and debits INR 100.00 to reach 0. |
+| | `withdrawal` acquires lock first (INR 100.00 bal) | Withdrawal debits INR 100.00 to balance 0. Close wakes up, observes balance == 0, and closes successfully. |
 | **Concurrent Freeze + Unfreeze** | Either order | Serialized under row lock; end state deterministically matches the last committed transaction. |
 | **Concurrent Close + Freeze** | `close` first (bal 0) | Account closed. Freeze wakes up, rejects `CLOSED` account with `422`. |
 | | `freeze` first (bal 0) | Account frozen. Close wakes up, allows closing `FROZEN` account with zero balance, resulting in `CLOSED`. |

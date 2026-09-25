@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Pattern;
  * Client supplies strictly the account currency; all other attributes
  * (balance, status, accountType, accountNumber, ownership) are system-assigned.
  *
- * @param currency ISO 4217 3-letter uppercase alphabetic currency code (e.g., "USD").
+ * @param currency ISO 4217 3-letter uppercase alphabetic currency code (e.g., "INR").
  */
 public record CreateAccountRequestDto(
         @NotNull(message = "Currency is required")

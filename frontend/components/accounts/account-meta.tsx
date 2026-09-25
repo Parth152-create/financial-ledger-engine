@@ -24,7 +24,7 @@ export function AccountMeta({
 }: AccountMetaProps) {
   return (
     <div className={cn("rounded-sm border border-border bg-card p-4 space-y-1 shadow-2xs", className)}>
-      <h3 className="text-xs font-semibold text-foreground font-sans mb-3">
+      <h3 className="text-[17px] font-semibold text-foreground font-sans mb-3 tracking-tight">
         Account Details
       </h3>
       <DataRow label="Account ID" value={accountId} monospace />

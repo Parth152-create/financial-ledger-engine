@@ -36,7 +36,7 @@ export function Section({
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border/70">
           <div className="flex items-center gap-2.5 min-w-0">
             {typeof title === "string" ? (
-              <h2 className="text-xs font-semibold text-foreground font-sans">
+              <h2 className="text-[17px] font-semibold text-foreground font-sans tracking-tight">
                 {title}
               </h2>
             ) : (
@@ -46,7 +46,7 @@ export function Section({
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
           {description && (
-            <p className="w-full text-xs text-muted-foreground font-sans mt-0.5">{description}</p>
+            <p className="w-full text-[13px] text-muted-foreground font-sans mt-0.5 leading-normal">{description}</p>
           )}
         </div>
       )}

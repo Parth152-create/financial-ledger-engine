@@ -7,10 +7,10 @@ export default function SettingsPage() {
     <div className="space-y-6 select-none font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground font-sans">
+          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
             Settings
           </h1>
-          <p className="text-xs text-muted-foreground font-sans">
+          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
             System configuration, backend connection parameters, and appearance settings.
           </p>
         </div>
@@ -39,24 +39,24 @@ export default function SettingsPage() {
       </div>
 
       <Section title="Appearance & Preferences">
-        <div className="flex items-center justify-between py-2.5 border-b border-border/40 text-xs">
+        <div className="flex items-center justify-between py-2.5 border-b border-border/40 text-[13.5px]">
           <div>
             <span className="font-medium text-foreground block">Theme</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[12.5px] text-muted-foreground">
               Switch between warm neutral light mode and deep graphite dark mode.
             </span>
           </div>
           <ThemeToggle />
         </div>
 
-        <div className="flex items-center justify-between py-2.5 text-xs">
+        <div className="flex items-center justify-between py-2.5 text-[13.5px]">
           <div>
             <span className="font-medium text-foreground block">Number Formatting</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[12.5px] text-muted-foreground">
               Tabular monospace figures applied to balances and transaction IDs.
             </span>
           </div>
-          <span className="text-xs text-muted-foreground font-mono">
+          <span className="text-[13px] text-muted-foreground font-mono">
             Indian Rupee (INR)
           </span>
         </div>

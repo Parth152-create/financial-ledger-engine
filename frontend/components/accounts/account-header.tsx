@@ -38,18 +38,18 @@ export function AccountHeader({
         </div>
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-sm font-semibold tracking-tight">
+            <span className="font-mono text-[15px] font-semibold tracking-tight">
               {accountNumber || accountId}
             </span>
-            <span className="text-xs font-sans text-muted-foreground">
+            <span className="text-[13.5px] font-sans text-muted-foreground">
               {accountType}
             </span>
-            <span className="text-[11px] font-mono uppercase px-1.5 py-0.5 rounded-sm border border-border/80 bg-muted/30 text-muted-foreground">
+            <span className="text-xs font-mono uppercase px-1.5 py-0.5 rounded-sm border border-border/80 bg-muted/30 text-muted-foreground">
               {currency}
             </span>
             <StatusBadge status={status} />
           </div>
-          <p className="text-xs text-muted-foreground font-mono truncate" title={accountId}>
+          <p className="text-[13px] text-muted-foreground font-mono truncate" title={accountId}>
             {accountId}
           </p>
         </div>
@@ -58,7 +58,7 @@ export function AccountHeader({
       <div className="flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-border/50">
         {balance !== undefined && (
           <div className="text-right">
-            <span className="text-xs text-muted-foreground font-sans block mb-0.5">
+            <span className="text-[13px] text-muted-foreground font-sans block mb-0.5">
               Available Balance
             </span>
             <AmountDisplay amount={balance} currency={currency} size="lg" align="right" />

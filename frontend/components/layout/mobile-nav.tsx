@@ -62,7 +62,7 @@ export function MobileNav({
 
             return (
               <div key={sectionName} className="space-y-1">
-                <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground/70">
+                <div className="px-2 pb-1 text-xs font-medium text-muted-foreground/75 uppercase tracking-wider">
                   {sectionName}
                 </div>
                 {items.map((item) => {
@@ -77,7 +77,7 @@ export function MobileNav({
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-xs transition-colors font-sans",
+                        "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[14px] transition-colors font-sans",
                         isActive
                           ? "bg-sidebar-accent text-foreground font-medium border-l-2 border-foreground"
                           : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"

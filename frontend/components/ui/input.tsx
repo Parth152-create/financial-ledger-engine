@@ -11,7 +11,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <input
         type={type}
         className={cn(
-          "flex h-8 w-full rounded-sm border border-input bg-background px-3 py-1 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs",
+          "flex h-8.5 w-full rounded-sm border border-input bg-background px-3 py-1 text-[13.5px] sm:text-sm text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs",
           monospace ? "font-mono tabular-nums" : "font-sans",
           className
         )}

@@ -1,4 +1,4 @@
-import { BarChart3, TrendingUp, DollarSign, Activity, Percent } from "lucide-react"
+import { BarChart3, TrendingUp, IndianRupee, Activity, Percent } from "lucide-react"
 import { Section } from "@/components/ui/section"
 import { Button } from "@/components/ui/button"
 import { DataRow } from "@/components/ui/data-row"
@@ -8,22 +8,22 @@ export default function AnalyticsPage() {
     <div className="space-y-6 select-none font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground font-sans">
+          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
             Analytics
           </h1>
-          <p className="text-xs text-muted-foreground font-sans">
+          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
             Transaction throughput, monetary volume, and settlement success metrics.
           </p>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="text-[13px]">
             Past 24 Hours
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="text-[13px]">
             Past 7 Days
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="text-[13px]">
             Past 30 Days
           </Button>
         </div>
@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-1 border border-border/70 rounded-sm p-0.5 bg-muted/20">
             <button
               type="button"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans rounded-xs bg-foreground text-background font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-sans rounded-xs bg-foreground text-background font-medium"
               title="Transaction Volume"
             >
               <BarChart3 className="size-3" />
@@ -44,15 +44,15 @@ export default function AnalyticsPage() {
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans rounded-xs text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-sans rounded-xs text-muted-foreground hover:text-foreground"
               title="Transaction Value"
             >
-              <DollarSign className="size-3" />
+              <IndianRupee className="size-3" />
               <span>Value</span>
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans rounded-xs text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-sans rounded-xs text-muted-foreground hover:text-foreground"
               title="Balance Trend"
             >
               <TrendingUp className="size-3" />
@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans rounded-xs text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-sans rounded-xs text-muted-foreground hover:text-foreground"
               title="Success Rate"
             >
               <Percent className="size-3" />
@@ -71,10 +71,10 @@ export default function AnalyticsPage() {
       >
         <div className="h-72 border border-dashed border-border/70 rounded-sm flex flex-col items-center justify-center p-6 bg-muted/10 text-center space-y-2">
           <Activity className="size-8 text-muted-foreground/40 mb-1" />
-          <p className="text-xs font-medium text-foreground font-sans">
+          <p className="text-[14px] font-medium text-foreground font-sans">
             Metrics Visualization Engine
           </p>
-          <p className="text-xs text-muted-foreground font-sans max-w-md">
+          <p className="text-[13px] text-muted-foreground font-sans max-w-md">
             Charts will visualize transaction activity, value flow, and settlement success once transactions are recorded in the ledger.
           </p>
         </div>

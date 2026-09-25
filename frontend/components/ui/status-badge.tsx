@@ -92,7 +92,7 @@ export function StatusBadge({ status, className, showDot = true }: StatusBadgePr
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm border text-[11px] font-sans font-medium tracking-normal select-none",
+        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm border text-[12px] font-sans font-medium tracking-normal select-none shrink-0 whitespace-nowrap",
         config.bg,
         config.border,
         config.text,

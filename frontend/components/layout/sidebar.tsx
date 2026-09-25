@@ -26,10 +26,10 @@ export function Sidebar({ className }: { className?: string }) {
             FL
           </div>
           <div className="flex flex-col leading-none">
-            <span className="text-xs font-semibold tracking-tight text-foreground">
+            <span className="text-sm font-semibold tracking-tight text-foreground">
               Financial Ledger
             </span>
-            <span className="text-[11px] text-muted-foreground mt-0.5">
+            <span className="text-xs text-muted-foreground mt-0.5">
               Engine
             </span>
           </div>
@@ -45,7 +45,7 @@ export function Sidebar({ className }: { className?: string }) {
 
           return (
             <div key={sectionName} className="space-y-1">
-              <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground/70">
+              <div className="px-2 pb-1 text-xs font-medium text-muted-foreground/75 uppercase tracking-wider">
                 {sectionName}
               </div>
               {items.map((item) => {
@@ -59,7 +59,7 @@ export function Sidebar({ className }: { className?: string }) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-xs transition-colors font-sans",
+                      "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[14px] transition-colors font-sans",
                       isActive
                         ? "bg-sidebar-accent text-foreground font-medium border-l-2 border-foreground"
                         : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
@@ -78,10 +78,10 @@ export function Sidebar({ className }: { className?: string }) {
       <div className="p-3 border-t border-sidebar-border bg-sidebar/50">
         <div className="flex items-center justify-between px-2 py-1.5 text-xs">
           <div className="min-w-0 pr-2">
-            <p className="text-xs font-medium text-foreground truncate">
+            <p className="text-[13px] font-medium text-foreground truncate">
               {user?.name || "Operator Session"}
             </p>
-            <p className="text-[11px] text-muted-foreground truncate font-mono">
+            <p className="text-xs text-muted-foreground truncate font-mono">
               {user?.email || "session@ledger"}
             </p>
           </div>

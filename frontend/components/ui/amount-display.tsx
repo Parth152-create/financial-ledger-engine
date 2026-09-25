@@ -13,10 +13,10 @@ interface AmountDisplayProps {
 
 const SIZE_CLASSES = {
   xs: "text-xs font-medium",
-  sm: "text-xs font-semibold",
-  default: "text-sm font-semibold",
-  lg: "text-base font-semibold",
-  xl: "text-2xl font-bold tracking-tight",
+  sm: "text-[13.5px] font-semibold",
+  default: "text-[16px] font-semibold tracking-tight",
+  lg: "text-[18px] sm:text-[19px] font-semibold tracking-tight",
+  xl: "text-2xl sm:text-[26px] font-bold tracking-tight",
 }
 
 export function AmountDisplay({
@@ -28,9 +28,10 @@ export function AmountDisplay({
   showSign = false,
   className,
 }: AmountDisplayProps) {
+  const num = typeof amount === "number" ? amount : Number(amount)
   const formattedAmount =
-    typeof amount === "number"
-      ? amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    !isNaN(num)
+      ? num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : String(amount)
 
   const sign = direction === "credit" ? "+" : direction === "debit" ? "-" : ""

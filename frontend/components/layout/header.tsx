@@ -33,22 +33,22 @@ export function Header({
         </button>
 
         <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold text-foreground font-sans tracking-tight">
+          <h1 className="text-[15px] font-semibold text-foreground font-sans tracking-tight">
             {pageTitle}
           </h1>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-sm border border-border/80 bg-muted/30 text-xs text-muted-foreground">
+        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-sm border border-border/80 bg-muted/30 text-[13px] text-muted-foreground">
           <Search className="size-3.5 text-muted-foreground/60" />
-          <span className="text-[11px]">Search transactions, accounts...</span>
+          <span className="text-xs">Search transactions, accounts...</span>
         </div>
 
         <ThemeToggle />
 
         {user && (
-          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-border text-xs">
+          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-border text-[13px]">
             <span className="font-medium text-foreground truncate max-w-[140px]">{user.name}</span>
           </div>
         )}
