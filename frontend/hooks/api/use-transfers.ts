@@ -33,9 +33,10 @@ export function useExecuteTransfer() {
         })
       }
 
-      // Invalidate transaction history and statement queries
+      // Invalidate transaction history, statement, and reconciliation queries
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["statements"] })
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
     },
   })
 }

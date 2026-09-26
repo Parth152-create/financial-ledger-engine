@@ -46,7 +46,7 @@ export function WithdrawalWorkflow({
   const [values, setValues] = React.useState<WithdrawalFormValues>({
     accountId: preselectedAccountId || "",
     amount: "",
-    currency: "USD",
+    currency: "",
     description: "",
   })
 
@@ -79,6 +79,7 @@ export function WithdrawalWorkflow({
     return checkingAccounts.find((a) => a.accountId === values.accountId)
   }, [checkingAccounts, values.accountId])
 
+  const effectiveCurrency = selectedAccount ? selectedAccount.currency : (values.currency || "")
 
   const handleAccountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newAccountId = e.target.value
@@ -86,12 +87,19 @@ export function WithdrawalWorkflow({
     setValues((prev) => ({
       ...prev,
       accountId: newAccountId,
-      currency: matched ? matched.currency : prev.currency,
+      currency: matched ? matched.currency : "",
     }))
     if (errors.accountId) {
       setErrors((prev) => {
         const next = { ...prev }
         delete next.accountId
+        return next
+      })
+    }
+    if (errors.currency) {
+      setErrors((prev) => {
+        const next = { ...prev }
+        delete next.currency
         return next
       })
     }
@@ -131,7 +139,12 @@ export function WithdrawalWorkflow({
     e.preventDefault()
     setSubmitError(null)
 
-    const validation = validateWithdrawalForm(values, selectedAccount)
+    const formValues: WithdrawalFormValues = {
+      ...values,
+      currency: effectiveCurrency,
+    }
+
+    const validation = validateWithdrawalForm(formValues, selectedAccount)
     if (!validation.isValid) {
       setErrors(validation.errors as Record<string, string>)
       if (validation.errors.accountId) {
@@ -142,6 +155,7 @@ export function WithdrawalWorkflow({
       return
     }
 
+    setValues(formValues)
     setErrors({})
 
     if (!idempotencyKey) {
@@ -176,7 +190,7 @@ export function WithdrawalWorkflow({
         request: {
           accountId: values.accountId,
           amount: Number(values.amount),
-          currency: values.currency,
+          currency: effectiveCurrency,
           description: values.description.trim() ? values.description.trim() : undefined,
         },
         idempotencyKey,
@@ -197,7 +211,7 @@ export function WithdrawalWorkflow({
     setValues({
       accountId: values.accountId,
       amount: "",
-      currency: selectedAccount?.currency || "USD",
+      currency: selectedAccount?.currency || "",
       description: "",
     })
     setIdempotencyKey(null)
@@ -213,8 +227,15 @@ export function WithdrawalWorkflow({
 
   const numAmount = Number(values.amount)
   const isAmountValid = !isNaN(numAmount) && numAmount > 0
+  const isCurrencyValid = Boolean(
+    selectedAccount &&
+    effectiveCurrency &&
+    effectiveCurrency === selectedAccount.currency
+  )
   const postWithdrawalBalance =
-    selectedAccount && isAmountValid ? selectedAccount.balance - numAmount : null
+    selectedAccount && isAmountValid && isCurrencyValid
+      ? selectedAccount.balance - numAmount
+      : null
 
   return (
     <>
@@ -393,7 +414,8 @@ export function WithdrawalWorkflow({
                       </label>
                       <Input
                         id="withdrawal-currency-display"
-                        value={values.currency}
+                        value={effectiveCurrency}
+                        placeholder="—"
                         disabled
                         monospace
                         className="bg-muted/40 text-center font-mono font-semibold"
@@ -413,12 +435,12 @@ export function WithdrawalWorkflow({
                         <span className="text-muted-foreground">Est. Source Balance After:</span>
                         <span
                           className={`font-mono font-medium ${
-                            postWithdrawalBalance !== null && postWithdrawalBalance < 0
+                            isCurrencyValid && postWithdrawalBalance !== null && postWithdrawalBalance < 0
                               ? "text-destructive"
                               : "text-foreground"
                           }`}
                         >
-                          {postWithdrawalBalance !== null
+                          {isCurrencyValid && postWithdrawalBalance !== null
                             ? `${selectedAccount.currency} ${postWithdrawalBalance.toLocaleString(
                                 "en-US",
                                 { minimumFractionDigits: 2, maximumFractionDigits: 2 }
@@ -426,9 +448,15 @@ export function WithdrawalWorkflow({
                             : "—"}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground/75 leading-tight">
-                        Client-side preview only. The ledger engine is the authoritative source of truth upon execution.
-                      </p>
+                      {!isCurrencyValid ? (
+                        <p className="text-[11px] text-destructive leading-tight">
+                          Balance preview unavailable due to currency mismatch.
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground/75 leading-tight">
+                          Client-side preview only. The ledger engine is the authoritative source of truth upon execution.
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -528,7 +556,7 @@ export function WithdrawalWorkflow({
                       </span>
                       <AmountDisplay
                         amount={selectedAccount?.balance ?? 0}
-                        currency={selectedAccount?.currency ?? values.currency}
+                        currency={selectedAccount?.currency ?? effectiveCurrency}
                         size="sm"
                       />
                     </div>
@@ -543,7 +571,7 @@ export function WithdrawalWorkflow({
                     </span>
                     <AmountDisplay
                       amount={values.amount}
-                      currency={values.currency}
+                      currency={effectiveCurrency}
                       size="lg"
                     />
                   </div>

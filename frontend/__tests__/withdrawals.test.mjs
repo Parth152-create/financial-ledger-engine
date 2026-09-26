@@ -430,3 +430,199 @@ test("Withdrawal Query Invalidation: invalidates accounts and source account det
   assert.deepEqual(invalidatedKeys[1], ["accounts", "detail", "source-acc-111"])
   assert.deepEqual(invalidatedKeys[2], ["transactions"])
 })
+
+// Withdrawal Workflow Currency State & Preview Logic Helper
+const createWithdrawalState = (preselectedAccountId = "", checkingAccounts = []) => {
+  let values = {
+    accountId: preselectedAccountId || "",
+    amount: "",
+    currency: "", // Unset initially rather than USD
+    description: "",
+  }
+
+  const getSelectedAccount = () => {
+    return checkingAccounts.find((a) => a.accountId === values.accountId)
+  }
+
+  const getEffectiveCurrency = () => {
+    const selected = getSelectedAccount()
+    return selected ? selected.currency : (values.currency || "")
+  }
+
+  const selectAccount = (newAccountId) => {
+    const matched = checkingAccounts.find((a) => a.accountId === newAccountId)
+    values = {
+      ...values,
+      accountId: newAccountId,
+      currency: matched ? matched.currency : "",
+    }
+  }
+
+  const setAmount = (newAmount) => {
+    values = {
+      ...values,
+      amount: newAmount,
+    }
+  }
+
+  const getPostWithdrawalBalance = () => {
+    const selected = getSelectedAccount()
+    const numAmount = Number(values.amount)
+    const isAmountValid = !isNaN(numAmount) && numAmount > 0
+    const effectiveCurrency = getEffectiveCurrency()
+    const isCurrencyValid = Boolean(
+      selected &&
+      effectiveCurrency &&
+      effectiveCurrency === selected.currency
+    )
+
+    if (selected && isAmountValid && isCurrencyValid) {
+      return selected.balance - numAmount
+    }
+    return null
+  }
+
+  const getReviewPayload = () => {
+    const effectiveCurrency = getEffectiveCurrency()
+    return {
+      ...values,
+      currency: effectiveCurrency,
+    }
+  }
+
+  return {
+    get values() {
+      return values
+    },
+    getSelectedAccount,
+    getEffectiveCurrency,
+    selectAccount,
+    setAmount,
+    getPostWithdrawalBalance,
+    getReviewPayload,
+  }
+}
+
+test("Withdrawal Workflow Currency: INR account selected -> withdrawal currency becomes INR", () => {
+  const accounts = [
+    { accountId: "acc-inr-1", accountNumber: "ACCT-INR-1", currency: "INR", balance: 5000, status: "ACTIVE" },
+    { accountId: "acc-usd-1", accountNumber: "ACCT-USD-1", currency: "USD", balance: 100, status: "ACTIVE" },
+  ]
+  const workflow = createWithdrawalState("", accounts)
+  assert.equal(workflow.getEffectiveCurrency(), "")
+  assert.equal(workflow.values.currency, "")
+
+  workflow.selectAccount("acc-inr-1")
+  assert.equal(workflow.getEffectiveCurrency(), "INR")
+  assert.equal(workflow.values.currency, "INR")
+  assert.notEqual(workflow.getEffectiveCurrency(), "USD")
+})
+
+test("Withdrawal Workflow Currency: USD account selected -> withdrawal currency becomes USD", () => {
+  const accounts = [
+    { accountId: "acc-inr-1", accountNumber: "ACCT-INR-1", currency: "INR", balance: 5000, status: "ACTIVE" },
+    { accountId: "acc-usd-1", accountNumber: "ACCT-USD-1", currency: "USD", balance: 100, status: "ACTIVE" },
+  ]
+  const workflow = createWithdrawalState("", accounts)
+  workflow.selectAccount("acc-usd-1")
+  assert.equal(workflow.getEffectiveCurrency(), "USD")
+  assert.equal(workflow.values.currency, "USD")
+})
+
+test("Withdrawal Workflow Currency: Switching accounts updates currency immediately", () => {
+  const accounts = [
+    { accountId: "acc-inr-1", accountNumber: "ACCT-INR-1", currency: "INR", balance: 5000, status: "ACTIVE" },
+    { accountId: "acc-usd-1", accountNumber: "ACCT-USD-1", currency: "USD", balance: 100, status: "ACTIVE" },
+    { accountId: "acc-eur-1", accountNumber: "ACCT-EUR-1", currency: "EUR", balance: 250, status: "ACTIVE" },
+  ]
+  const workflow = createWithdrawalState("", accounts)
+
+  workflow.selectAccount("acc-inr-1")
+  assert.equal(workflow.getEffectiveCurrency(), "INR")
+
+  workflow.selectAccount("acc-usd-1")
+  assert.equal(workflow.getEffectiveCurrency(), "USD")
+
+  workflow.selectAccount("acc-eur-1")
+  assert.equal(workflow.getEffectiveCurrency(), "EUR")
+})
+
+test("Withdrawal Workflow Currency: No account selected leaves currency unset rather than USD", () => {
+  const accounts = [
+    { accountId: "acc-inr-1", accountNumber: "ACCT-INR-1", currency: "INR", balance: 5000, status: "ACTIVE" },
+  ]
+  const workflow = createWithdrawalState("", accounts)
+  assert.equal(workflow.values.currency, "")
+  assert.equal(workflow.getEffectiveCurrency(), "")
+  assert.notEqual(workflow.values.currency, "USD")
+
+  workflow.selectAccount("acc-inr-1")
+  assert.equal(workflow.getEffectiveCurrency(), "INR")
+  workflow.selectAccount("")
+  assert.equal(workflow.values.currency, "")
+  assert.equal(workflow.getEffectiveCurrency(), "")
+})
+
+test("Withdrawal Workflow Balance Preview: Invalid currency state does not show a fabricated balance-after preview", () => {
+  const inrAccount = {
+    accountId: "acc-inr-1",
+    accountNumber: "ACCT-INR-1",
+    currency: "INR",
+    balance: 5000.0,
+    status: "ACTIVE",
+  }
+  const accounts = [inrAccount]
+  const workflow = createWithdrawalState("", accounts)
+  workflow.selectAccount("acc-inr-1")
+  workflow.setAmount("1000.00")
+
+  // When currency is valid (INR matches account INR), balance preview is calculated
+  assert.equal(workflow.getPostWithdrawalBalance(), 4000.0)
+
+  // If currency is mismatched (e.g. USD with INR account), preview MUST be null (renders as '—')
+  const calculatePreview = (account, amount, currency) => {
+    const numAmount = Number(amount)
+    const isAmountValid = !isNaN(numAmount) && numAmount > 0
+    const isCurrencyValid = Boolean(account && currency && currency === account.currency)
+    return account && isAmountValid && isCurrencyValid ? account.balance - numAmount : null
+  }
+
+  assert.equal(calculatePreview(inrAccount, "1000.00", "USD"), null)
+  assert.equal(calculatePreview(inrAccount, "1000.00", ""), null)
+  assert.equal(calculatePreview(inrAccount, "1000.00", "EUR"), null)
+  assert.equal(calculatePreview(inrAccount, "1000.00", "INR"), 4000.0)
+})
+
+test("Withdrawal Workflow Preselection: Account-detail initiated withdrawal inherits selected account currency", () => {
+  const inrAccount = {
+    accountId: "acc-inr-detail",
+    accountNumber: "ACCT-INR-999",
+    currency: "INR",
+    balance: 10000.0,
+    status: "ACTIVE",
+  }
+  const accounts = [inrAccount]
+
+  // Preselected accountId passed as prop from account detail page
+  const workflow = createWithdrawalState("acc-inr-detail", accounts)
+
+  assert.equal(workflow.values.accountId, "acc-inr-detail")
+  assert.equal(workflow.getEffectiveCurrency(), "INR")
+
+  workflow.setAmount("2500.00")
+  assert.equal(workflow.getPostWithdrawalBalance(), 7500.0)
+
+  const payload = workflow.getReviewPayload()
+  assert.equal(payload.currency, "INR")
+  assert.equal(payload.accountId, "acc-inr-detail")
+
+  // Validates successfully with matching INR
+  const validation = validateWithdrawal({
+    accountId: payload.accountId,
+    amount: payload.amount,
+    currency: payload.currency,
+    account: inrAccount,
+  })
+  assert.equal(validation.isValid, true)
+})
+

@@ -26,6 +26,7 @@ export function useExecuteWithdrawal() {
       }
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["statements"] })
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] })
     },
   })
 }
