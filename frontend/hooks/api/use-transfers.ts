@@ -33,8 +33,9 @@ export function useExecuteTransfer() {
         })
       }
 
-      // Invalidate transaction history queries if present
+      // Invalidate transaction history and statement queries
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
+      queryClient.invalidateQueries({ queryKey: ["statements"] })
     },
   })
 }

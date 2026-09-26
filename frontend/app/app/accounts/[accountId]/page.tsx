@@ -3,18 +3,31 @@
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, ArrowLeftRight, ArrowDownLeft, ArrowUpRight, Download, AlertCircle, RotateCw } from "lucide-react"
+import {
+  ArrowLeft,
+  ArrowLeftRight,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ReceiptText,
+  History,
+  AlertCircle,
+  RotateCw,
+} from "lucide-react"
 import { AccountHeader } from "@/components/accounts/account-header"
 import { AccountMeta } from "@/components/accounts/account-meta"
 import { Section } from "@/components/ui/section"
 import { Button } from "@/components/ui/button"
+import { AccountTransactionHistory } from "@/components/transactions/account-transaction-history"
+import { AccountStatementView } from "@/components/statement/account-statement-view"
 import { ROUTES } from "@/constants/routes"
 import { useAccount } from "@/hooks/api/use-accounts"
 import { formatDate } from "@/lib/formatters/date"
+import { cn } from "@/lib/utils"
 
 export default function AccountDetailPage() {
   const params = useParams()
   const accountId = typeof params?.accountId === "string" ? params.accountId : ""
+  const [activeTab, setActiveTab] = React.useState<"transactions" | "statement">("transactions")
 
   const { data: account, isLoading, isError, error, refetch } = useAccount(accountId)
 
@@ -150,9 +163,14 @@ export default function AccountDetailPage() {
         status={account.status}
         balance={account.balance}
         actions={
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="size-3.5" />
-            <span>Download Statement</span>
+          <Button
+            variant={activeTab === "statement" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab((prev) => (prev === "statement" ? "transactions" : "statement"))}
+            className="gap-1.5"
+          >
+            <ReceiptText className="size-3.5" />
+            <span>{activeTab === "statement" ? "View Transactions" : "Account Statement"}</span>
           </Button>
         }
       />
@@ -169,30 +187,59 @@ export default function AccountDetailPage() {
           />
         </div>
 
-        <div className="md:col-span-2">
-          <Section
-            title="Account Transaction History"
-            description="All debit and credit movements affecting this account."
-          >
-            <div className="border border-border/70 rounded-sm overflow-hidden">
-              <div className="grid grid-cols-12 gap-3 px-4 py-2 bg-muted/30 text-[13px] text-muted-foreground font-medium border-b border-border/70">
-                <span className="col-span-3">Date & Time</span>
-                <span className="col-span-3">Type</span>
-                <span className="col-span-2 text-center">Flow</span>
-                <span className="col-span-2 text-right">Amount</span>
-                <span className="col-span-2 text-right">Status</span>
-              </div>
-
-              <div className="p-10 text-center space-y-2 bg-card">
-                <p className="text-[15px] font-medium text-foreground">
-                  No transactions recorded
-                </p>
-                <p className="text-[13.5px] text-muted-foreground max-w-xs mx-auto">
-                  Transactions affecting this checking instrument will appear here once executed.
-                </p>
-              </div>
+        <div className="md:col-span-2 space-y-3">
+          <div className="flex items-center justify-between border-b border-border/70 pb-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("transactions")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xs transition-colors",
+                  activeTab === "transactions"
+                    ? "bg-muted text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <History className="size-3.5" />
+                <span>Transaction History</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("statement")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xs transition-colors",
+                  activeTab === "statement"
+                    ? "bg-muted text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <ReceiptText className="size-3.5" />
+                <span>Account Statement</span>
+              </button>
             </div>
-          </Section>
+          </div>
+
+          {activeTab === "transactions" ? (
+            <Section
+              title="Account Transaction History"
+              description="All debit and credit movements affecting this account."
+            >
+              <AccountTransactionHistory
+                accountId={account.accountId}
+                currency={account.currency}
+              />
+            </Section>
+          ) : (
+            <Section
+              title="Account Statement"
+              description="Chronological record of transactions with opening, closing, and running balances."
+            >
+              <AccountStatementView
+                accountId={account.accountId}
+                currency={account.currency}
+              />
+            </Section>
+          )}
         </div>
       </div>
     </div>

@@ -25,6 +25,7 @@ export function useExecuteDeposit() {
         })
       }
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
+      queryClient.invalidateQueries({ queryKey: ["statements"] })
     },
   })
 }
