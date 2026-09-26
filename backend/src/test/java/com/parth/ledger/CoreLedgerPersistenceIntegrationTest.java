@@ -67,8 +67,8 @@ class CoreLedgerPersistenceIntegrationTest {
         BigDecimal initialAliceBalance = new BigDecimal("1000.5000");
         BigDecimal initialBobBalance = new BigDecimal("250.0000");
 
-        Account sourceAccount = accountRepository.save(new Account(alice, "USD", initialAliceBalance));
-        Account destinationAccount = accountRepository.save(new Account(bob, "USD", initialBobBalance));
+        Account sourceAccount = accountRepository.save(new Account(alice, "INR", initialAliceBalance));
+        Account destinationAccount = accountRepository.save(new Account(bob, "INR", initialBobBalance));
 
         assertThat(sourceAccount.getId()).isNotNull();
         assertThat(sourceAccount.getVersion()).isNotNull();
@@ -81,7 +81,7 @@ class CoreLedgerPersistenceIntegrationTest {
         Transaction transaction = new Transaction(
                 idempotencyKey,
                 transferAmount,
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 sourceAccount,
                 destinationAccount
@@ -123,7 +123,7 @@ class CoreLedgerPersistenceIntegrationTest {
         Transaction retrievedTx = retrievedTxOpt.get();
         assertThat(retrievedTx.getIdempotencyKey()).isEqualTo(idempotencyKey);
         assertThat(retrievedTx.getAmount()).isEqualByComparingTo(new BigDecimal("150.2500"));
-        assertThat(retrievedTx.getCurrency()).isEqualTo("USD");
+        assertThat(retrievedTx.getCurrency()).isEqualTo("INR");
         assertThat(retrievedTx.getStatus()).isEqualTo(TransactionStatus.PENDING);
         assertThat(retrievedTx.getSourceAccount().getId()).isEqualTo(sourceAccount.getId());
         assertThat(retrievedTx.getDestinationAccount().getId()).isEqualTo(destinationAccount.getId());
@@ -158,14 +158,14 @@ class CoreLedgerPersistenceIntegrationTest {
     @DisplayName("Verify unique idempotency key constraint rejects duplicates")
     void verifyUniqueIdempotencyKeyConstraint() {
         User user = userRepository.save(new User("idemp-test@example.com", "Idemp User"));
-        Account acc1 = accountRepository.save(new Account(user, "USD", new BigDecimal("500.0000")));
-        Account acc2 = accountRepository.save(new Account(user, "USD", new BigDecimal("500.0000")));
+        Account acc1 = accountRepository.save(new Account(user, "INR", new BigDecimal("500.0000")));
+        Account acc2 = accountRepository.save(new Account(user, "INR", new BigDecimal("500.0000")));
 
         String duplicateKey = "tx-dup-key-999";
         Transaction tx1 = new Transaction(
                 duplicateKey,
                 new BigDecimal("50.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 acc1,
                 acc2
@@ -175,7 +175,7 @@ class CoreLedgerPersistenceIntegrationTest {
         Transaction tx2 = new Transaction(
                 duplicateKey,
                 new BigDecimal("50.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 acc1,
                 acc2
@@ -198,7 +198,7 @@ class CoreLedgerPersistenceIntegrationTest {
     @DisplayName("Verify negative account balance check constraint triggers violation")
     void verifyNegativeAccountBalanceConstraint() {
         User user = userRepository.save(new User("negative-test@example.com", "Balance Test"));
-        Account negativeAccount = new Account(user, "USD", new BigDecimal("-10.0000"));
+        Account negativeAccount = new Account(user, "INR", new BigDecimal("-10.0000"));
 
         assertThatThrownBy(() -> accountRepository.saveAndFlush(negativeAccount))
                 .isInstanceOf(DataIntegrityViolationException.class);
@@ -209,7 +209,7 @@ class CoreLedgerPersistenceIntegrationTest {
     void verifyMonetaryPrecisionRoundTrip() {
         User user = userRepository.save(new User("precision@example.com", "Precision User"));
         BigDecimal preciseBalance = new BigDecimal("123456789012345.6789");
-        Account account = accountRepository.save(new Account(user, "USD", preciseBalance));
+        Account account = accountRepository.save(new Account(user, "INR", preciseBalance));
 
         Account retrieved = accountRepository.findById(account.getId()).orElseThrow();
         assertThat(retrieved.getBalance()).isEqualByComparingTo(preciseBalance);

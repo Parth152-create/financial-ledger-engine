@@ -17,6 +17,7 @@ import com.parth.ledger.ledger.LedgerEntryType;
 import com.parth.ledger.reconciliation.ReconciliationStatus;
 import com.parth.ledger.reconciliation.dto.ReconciliationResultDto;
 import com.parth.ledger.reconciliation.service.ReconciliationService;
+import com.parth.ledger.system.SystemFundingService;
 import com.parth.ledger.transaction.Transaction;
 import com.parth.ledger.transaction.TransactionRepository;
 import com.parth.ledger.transaction.TransactionStatus;
@@ -111,6 +112,9 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReconciliationService reconciliationService;
 
+    @Autowired
+    private SystemFundingService systemFundingService;
+
     private User aliceUser;
     private User bobUser;
     private Account aliceAccount;
@@ -134,8 +138,8 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.withdrawal@ledger.com", "Alice"));
         bobUser = userRepository.save(new User("bob.withdrawal@ledger.com", "Bob"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO.setScale(4)));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", BigDecimal.ZERO.setScale(4)));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO.setScale(4)));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO.setScale(4)));
 
         clearingAccount = ensureSystemClearingAccount(INITIAL_CLEARING_BALANCE);
     }
@@ -153,13 +157,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
     }
 
     private Account ensureSystemClearingAccount(BigDecimal initialBalance) {
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'USD', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
-                        "ON CONFLICT (id) DO UPDATE SET balance = EXCLUDED.balance, status = 'ACTIVE'",
-                initialBalance
-        );
-        return accountRepository.findById(WithdrawalService.SYSTEM_CLEARING_ACCOUNT_ID).orElseThrow();
+        return systemFundingService.bootstrapSystemFunding(initialBalance);
     }
 
     private void fundAccount(User user, Account account, BigDecimal amount) {
@@ -198,7 +196,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD",
+                    "INR",
                     "ATM withdrawal"
             );
 
@@ -214,7 +212,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.sourceAccountId", is(aliceAccount.getId().toString())))
                     .andExpect(jsonPath("$.destinationAccountId", is(WithdrawalService.SYSTEM_CLEARING_ACCOUNT_ID.toString())))
                     .andExpect(jsonPath("$.amount", is(100.0000)))
-                    .andExpect(jsonPath("$.currency", is("USD")))
+                    .andExpect(jsonPath("$.currency", is("INR")))
                     .andExpect(jsonPath("$.description", is("ATM withdrawal")));
         }
 
@@ -227,7 +225,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("200.0000"),
-                    "USD",
+                    "INR",
                     "Payout"
             );
 
@@ -255,7 +253,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -275,7 +273,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("150.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -289,14 +287,14 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                     .findFirst().orElseThrow();
             assertThat(userEntry.getEntryType()).isEqualTo(LedgerEntryType.DEBIT);
             assertThat(userEntry.getAmount()).isEqualByComparingTo(new BigDecimal("150.0000"));
-            assertThat(userEntry.getCurrency()).isEqualTo("USD");
+            assertThat(userEntry.getCurrency()).isEqualTo("INR");
 
             LedgerEntry clearingEntry = entries.stream()
                     .filter(e -> e.getAccount().getId().equals(WithdrawalService.SYSTEM_CLEARING_ACCOUNT_ID))
                     .findFirst().orElseThrow();
             assertThat(clearingEntry.getEntryType()).isEqualTo(LedgerEntryType.CREDIT);
             assertThat(clearingEntry.getAmount()).isEqualByComparingTo(new BigDecimal("150.0000"));
-            assertThat(clearingEntry.getCurrency()).isEqualTo("USD");
+            assertThat(clearingEntry.getCurrency()).isEqualTo("INR");
 
             assertThat(userEntry.getAmount()).isEqualByComparingTo(clearingEntry.getAmount());
         }
@@ -309,7 +307,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("120.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -337,7 +335,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("150.0000"),
-                    "USD"
+                    "INR"
             );
 
             executeAsUser("alice.withdrawal@ledger.com",
@@ -367,7 +365,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     BigDecimal.ZERO,
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -385,7 +383,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("-50.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -403,7 +401,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("10.12345"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -422,7 +420,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                 {
                     "accountId": "not-a-valid-uuid",
                     "amount": 100.00,
-                    "currency": "USD"
+                    "currency": "INR"
                 }
             """;
 
@@ -464,8 +462,8 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
                     () -> withdrawalService.executeWithdrawal("wdr-val-012", request)))
-                    .isInstanceOf(CurrencyMismatchException.class)
-                    .hasMessageContaining("does not match");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Only INR currency is supported: EUR");
         }
 
         @Test
@@ -474,7 +472,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -490,7 +488,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -518,7 +516,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             String json = """
                 {
                     "amount": 100.00,
-                    "currency": "USD"
+                    "currency": "INR"
                 }
             """;
 
@@ -544,7 +542,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -562,7 +560,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     bobAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -580,7 +578,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     WithdrawalService.SYSTEM_CLEARING_ACCOUNT_ID,
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -598,7 +596,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     UUID.randomUUID(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -628,7 +626,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -651,7 +649,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -680,7 +678,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -703,7 +701,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -722,7 +720,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("0.0100"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -750,7 +748,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -783,7 +781,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD",
+                    "INR",
                     "ATM cash"
             );
 
@@ -812,8 +810,8 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         void sameKeyDifferentAmountReturns409() throws Exception {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("500.0000"));
 
-            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
-            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("150.0000"), "USD");
+            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
+            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("150.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
@@ -835,11 +833,11 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         @DisplayName("29. Same key with different account returns 409 Conflict")
         void sameKeyDifferentAccountReturns409() throws Exception {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("500.0000"));
-            Account aliceSecondAccount = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO.setScale(4)));
+            Account aliceSecondAccount = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO.setScale(4)));
             fundAccount(aliceUser, aliceSecondAccount, new BigDecimal("500.0000"));
 
-            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
-            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceSecondAccount.getId(), new BigDecimal("100.0000"), "USD");
+            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
+            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceSecondAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
@@ -858,11 +856,11 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("30. Same key with different currency returns 409 Conflict")
+        @DisplayName("30. Replay with non-INR currency returns 400 Bad Request")
         void sameKeyDifferentCurrencyReturns409() throws Exception {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("500.0000"));
 
-            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
             WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "EUR");
 
             mockMvc.perform(post("/api/v1/withdrawals")
@@ -877,7 +875,9 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                             .header("Idempotency-Key", "wdr-idem-030")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
-                    .andExpect(status().isConflict());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status", is(400)))
+                    .andExpect(jsonPath("$.message", containsString("Only INR currency is supported: EUR")));
         }
 
         @Test
@@ -885,8 +885,8 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         void sameKeyDifferentDescriptionReturns409() throws Exception {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("500.0000"));
 
-            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Desc A");
-            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Desc B");
+            WithdrawalRequestDto req1 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Desc A");
+            WithdrawalRequestDto req2 = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Desc B");
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
@@ -914,7 +914,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -938,7 +938,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.withdrawal@ledger.com",
@@ -960,7 +960,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto initialResponse = executeAsUser("alice.withdrawal@ledger.com",
@@ -999,7 +999,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -1026,7 +1026,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -1058,7 +1058,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -1084,7 +1084,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -1120,7 +1120,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto request = new WithdrawalRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.withdrawal@ledger.com",
@@ -1164,7 +1164,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         WithdrawalRequestDto request = new WithdrawalRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD"
+                                "INR"
                         );
                         executeAsUser("alice.withdrawal@ledger.com",
                                 () -> withdrawalService.executeWithdrawal("wdr-conc-39-" + idx, request));
@@ -1213,7 +1213,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         WithdrawalRequestDto request = new WithdrawalRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD"
+                                "INR"
                         );
                         executeAsUser("alice.withdrawal@ledger.com",
                                 () -> withdrawalService.executeWithdrawal("wdr-conc-40-" + idx, request));
@@ -1264,7 +1264,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         executeAsUser("alice.withdrawal@ledger.com", () ->
                                 depositService.executeDeposit(
                                         "conc-dep-" + idx,
-                                        new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD")
+                                        new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR")
                                 )
                         );
                         depositSuccesses.incrementAndGet();
@@ -1282,7 +1282,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         executeAsUser("alice.withdrawal@ledger.com", () ->
                                 withdrawalService.executeWithdrawal(
                                         "conc-wdr-" + idx,
-                                        new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD")
+                                        new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR")
                                 )
                         );
                         withdrawalSuccesses.incrementAndGet();
@@ -1332,7 +1332,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         executeAsUser("alice.withdrawal@ledger.com", () ->
                                 transferService.executeTransfer(
                                         "conc-tf-" + idx,
-                                        new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "USD")
+                                        new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "INR")
                                 )
                         );
                         transferSuccesses.incrementAndGet();
@@ -1350,7 +1350,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         executeAsUser("alice.withdrawal@ledger.com", () ->
                                 withdrawalService.executeWithdrawal(
                                         "conc-wdr-tf-" + idx,
-                                        new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "USD")
+                                        new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "INR")
                                 )
                         );
                         withdrawalSuccesses.incrementAndGet();
@@ -1386,7 +1386,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             int threadCount = 10;
             String sharedKey = "wdr-conc-idem-shared";
             BigDecimal amount = new BigDecimal("100.0000");
-            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), amount, "USD");
+            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), amount, "INR");
 
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
             CountDownLatch startLatch = new CountDownLatch(1);
@@ -1441,7 +1441,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
                         WithdrawalRequestDto request = new WithdrawalRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD"
+                                "INR"
                         );
                         executeAsUser("alice.withdrawal@ledger.com",
                                 () -> withdrawalService.executeWithdrawal("wdr-recon-conc-" + idx, request));

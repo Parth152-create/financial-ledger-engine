@@ -113,10 +113,16 @@ public class TransferService {
         if (request.currency() == null || request.currency().trim().isEmpty()) {
             throw new IllegalArgumentException("Currency must not be blank");
         }
+        String currency = request.currency().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!currency.matches("^[A-Z]{3}$")) {
+            throw new IllegalArgumentException("Currency must be a 3-character ISO code: " + currency);
+        }
+        if (!"INR".equals(currency)) {
+            throw new IllegalArgumentException("Only INR currency is supported: " + currency);
+        }
 
         // Standardize scale to 4 decimal places matching PostgreSQL NUMERIC(19,4)
         BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
-        String currency = request.currency().trim().toUpperCase();
         String cleanDescription = (request.description() != null && !request.description().isBlank()) ? request.description().trim() : null;
 
         // 5. Resolve authenticated application user from SecurityContext

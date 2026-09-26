@@ -91,16 +91,16 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.failure@ledger.com", "Alice"));
         bobUser = userRepository.save(new User("bob.failure@ledger.com", "Bob"));
 
-        funderAccount = accountRepository.save(new Account(funderUser, "USD", new BigDecimal("100000.0000")));
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD"));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD"));
+        funderAccount = accountRepository.save(new Account(funderUser, "INR", new BigDecimal("100000.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR"));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR"));
 
         // Fund Alice with 2000.0000 and Bob with 1000.0000 via double-entry transfers
         executeAsUser("funder.failure@ledger.com", () -> {
             transferService.executeTransfer("fund-alice-fail-test",
-                    new TransferRequestDto(funderAccount.getId(), aliceAccount.getId(), new BigDecimal("2000.0000"), "USD"));
+                    new TransferRequestDto(funderAccount.getId(), aliceAccount.getId(), new BigDecimal("2000.0000"), "INR"));
             transferService.executeTransfer("fund-bob-fail-test",
-                    new TransferRequestDto(funderAccount.getId(), bobAccount.getId(), new BigDecimal("1000.0000"), "USD"));
+                    new TransferRequestDto(funderAccount.getId(), bobAccount.getId(), new BigDecimal("1000.0000"), "INR"));
         });
     }
 
@@ -120,7 +120,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Simulate complete Redis outage on GET
@@ -175,7 +175,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Simulate Redis failure during post-commit caching
@@ -242,7 +242,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         int threadCount = 20;
@@ -316,7 +316,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Simulate complete Redis outage across both GET and SET
@@ -415,7 +415,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                             aliceAccount.getId(),
                             bobAccount.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (Throwable t) {
@@ -440,7 +440,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                             bobAccount.getId(),
                             aliceAccount.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (Throwable t) {
@@ -510,7 +510,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 originalAmount,
-                "USD"
+                "INR"
         );
 
         // Transfer 1 succeeds
@@ -523,7 +523,7 @@ class TransferFailureIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("250.0000"),
-                "USD"
+                "INR"
         );
 
         executeAsUser("alice.failure@ledger.com", () -> {

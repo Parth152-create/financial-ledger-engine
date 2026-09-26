@@ -88,9 +88,9 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
         bobUser = userRepository.save(new User("bob.sec@ledger.com", "Bob Sec"));
         charlieUser = userRepository.save(new User("charlie.sec@ledger.com", "Charlie Sec"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
-        charlieAccount = accountRepository.save(new Account(charlieUser, "USD", new BigDecimal("300.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
+        charlieAccount = accountRepository.save(new Account(charlieUser, "INR", new BigDecimal("300.0000")));
     }
 
     @AfterEach
@@ -105,7 +105,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -122,7 +122,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -151,7 +151,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -179,7 +179,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 charlieAccount.getId(),
                 new BigDecimal("75.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -206,7 +206,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -226,7 +226,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         // Authenticate as Bob and attempt to debit Alice's account directly via TransferService
@@ -246,7 +246,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         // Explicitly ensure SecurityContext is empty
@@ -292,7 +292,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         // 1. Alice performs the transfer successfully, populating Redis cache

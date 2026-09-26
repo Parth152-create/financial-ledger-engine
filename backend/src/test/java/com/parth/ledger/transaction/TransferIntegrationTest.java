@@ -73,9 +73,9 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         bobUser = userRepository.save(new User("bob@ledger.com", "Bob"));
         charlieUser = userRepository.save(new User("charlie@ledger.com", "Charlie"));
 
-        aliceUsdAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobUsdAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
-        charlieEurAccount = accountRepository.save(new Account(charlieUser, "EUR", new BigDecimal("300.0000")));
+        aliceUsdAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobUsdAccount = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
+        charlieEurAccount = accountRepository.save(new Account(charlieUser, "INR", new BigDecimal("300.0000")));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("alice@ledger.com", null, Collections.emptyList())
@@ -97,7 +97,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         TransferResponseDto response = transferService.executeTransfer(idempotencyKey, request);
@@ -108,7 +108,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         assertThat(response.sourceAccountId()).isEqualTo(aliceUsdAccount.getId());
         assertThat(response.destinationAccountId()).isEqualTo(bobUsdAccount.getId());
         assertThat(response.amount()).isEqualByComparingTo(transferAmount);
-        assertThat(response.currency()).isEqualTo("USD");
+        assertThat(response.currency()).isEqualTo("INR");
         assertThat(response.createdAt()).isNotNull();
         assertThat(response.completedAt()).isNotNull();
 
@@ -147,7 +147,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Insufficient balance: rejects transfer, leaves balances unchanged, creates no transaction or ledger records")
     void verifyInsufficientBalanceRejection() {
-        Account lowBalanceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("50.0000")));
+        Account lowBalanceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("50.0000")));
         String idempotencyKey = "tx-insufficient-001";
         BigDecimal transferAmount = new BigDecimal("100.0000");
 
@@ -155,7 +155,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 lowBalanceAccount.getId(),
                 bobUsdAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer(idempotencyKey, request))
@@ -180,7 +180,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 aliceUsdAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer("tx-same-account-001", request))
@@ -194,9 +194,9 @@ class TransferIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Currency mismatch: rejects transfer when accounts or request currencies differ")
+    @DisplayName("Currency validation: rejects transfer when request currency is not INR")
     void verifyCurrencyMismatchRejection() {
-        // Source USD, Destination EUR
+        // Source INR, Destination INR, but request specifies USD
         TransferRequestDto request1 = new TransferRequestDto(
                 aliceUsdAccount.getId(),
                 charlieEurAccount.getId(),
@@ -205,9 +205,10 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer("tx-currency-001", request1))
-                .isInstanceOf(CurrencyMismatchException.class);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only INR currency is supported: USD");
 
-        // Source USD, Destination USD, but request specifies GBP
+        // Source INR, Destination INR, but request specifies GBP
         TransferRequestDto request2 = new TransferRequestDto(
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
@@ -216,7 +217,8 @@ class TransferIntegrationTest extends BaseIntegrationTest {
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer("tx-currency-002", request2))
-                .isInstanceOf(CurrencyMismatchException.class);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only INR currency is supported: GBP");
 
         // Verify balances unchanged
         assertThat(accountRepository.findById(aliceUsdAccount.getId()).orElseThrow().getBalance())
@@ -236,7 +238,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // First attempt
@@ -279,7 +281,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
         transferService.executeTransfer(idempotencyKey, request1);
 
@@ -288,19 +290,19 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("200.0000"),
-                "USD"
+                "INR"
         );
         assertThatThrownBy(() -> transferService.executeTransfer(idempotencyKey, requestDiffAmount))
                 .isInstanceOf(IdempotencyConflictException.class)
                 .hasMessageContaining("different parameters");
 
         // Reuse same key with different destination account
-        Account danUsdAccount = accountRepository.save(new Account(charlieUser, "USD", new BigDecimal("100.0000")));
+        Account danUsdAccount = accountRepository.save(new Account(charlieUser, "INR", new BigDecimal("100.0000")));
         TransferRequestDto requestDiffDest = new TransferRequestDto(
                 aliceUsdAccount.getId(),
                 danUsdAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
         assertThatThrownBy(() -> transferService.executeTransfer(idempotencyKey, requestDiffDest))
                 .isInstanceOf(IdempotencyConflictException.class);
@@ -325,7 +327,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 nonExistentId,
                 bobUsdAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer("tx-not-found-001", request))
@@ -340,7 +342,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 BigDecimal.ZERO,
-                "USD"
+                "INR"
         );
         assertThatThrownBy(() -> transferService.executeTransfer("tx-invalid-amt-001", zeroRequest))
                 .isInstanceOf(InvalidAmountException.class);
@@ -349,7 +351,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("-50.0000"),
-                "USD"
+                "INR"
         );
         assertThatThrownBy(() -> transferService.executeTransfer("tx-invalid-amt-002", negativeRequest))
                 .isInstanceOf(InvalidAmountException.class);
@@ -365,7 +367,7 @@ class TransferIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Inject failure specifically when saving the CREDIT ledger entry

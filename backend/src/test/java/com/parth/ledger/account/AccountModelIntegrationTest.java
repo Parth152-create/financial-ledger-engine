@@ -79,8 +79,8 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.v2@ledger.com", "Alice V2"));
         bobUser = userRepository.save(new User("bob.v2@ledger.com", "Bob V2"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
     }
 
     @AfterEach
@@ -113,7 +113,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Account type: SYSTEM_CLEARING account persisted with null user_id")
     void persistSystemClearingAccountWithNullUser() {
-        Account clearing = Account.createSystemClearingAccount("USD", "SYS-CLEAR-001");
+        Account clearing = Account.createSystemClearingAccount("INR", "SYS-CLEAR-001");
         clearing = accountRepository.save(clearing);
 
         Account retrieved = accountRepository.findById(clearing.getId()).orElseThrow();
@@ -130,7 +130,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'USD', 0, 0, NOW(), NOW(), 'SAVINGS', 'ACTIVE', ?)",
+                        "VALUES (?, ?, 'INR', 0, 0, NOW(), NOW(), 'SAVINGS', 'ACTIVE', ?)",
                 accountId, aliceUser.getId(), "ACCT-INVALID-TYPE"
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("chk_accounts_account_type");
@@ -142,7 +142,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, NULL, 'USD', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
+                        "VALUES (?, NULL, 'INR', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
                 accountId, "ACCT-NULL-USER"
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("chk_accounts_user_requirement");
@@ -189,7 +189,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'USD', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'SUSPENDED', ?)",
+                        "VALUES (?, ?, 'INR', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'SUSPENDED', ?)",
                 accountId, aliceUser.getId(), "ACCT-INVALID-STATUS"
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("chk_accounts_status");
@@ -213,7 +213,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     void databaseConstraintRejectsDuplicateAccountNumber() {
         String existingNumber = aliceAccount.getAccountNumber();
 
-        Account duplicate = new Account(bobUser, "USD", BigDecimal.ZERO, AccountType.USER_CHECKING, AccountStatus.ACTIVE, existingNumber);
+        Account duplicate = new Account(bobUser, "INR", BigDecimal.ZERO, AccountType.USER_CHECKING, AccountStatus.ACTIVE, existingNumber);
         assertThatThrownBy(() -> accountRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -224,59 +224,64 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'USD', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', NULL)",
+                        "VALUES (?, ?, 'INR', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', NULL)",
                 accountId, aliceUser.getId()
         )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     // =========================================================================
-    // 4. DATABASE CURRENCY FORMAT VALIDATION TESTS
+    // 4. DATABASE CURRENCY VALIDATION TESTS
     // =========================================================================
 
     @Test
-    @DisplayName("Currency validation: DB CHECK constraint accepts valid ISO 3-letter uppercase currencies")
+    @DisplayName("Currency validation: DB CHECK constraint accepts INR and rejects non-INR currencies")
     void databaseConstraintAcceptsValidCurrencyFormat() {
-        Account eurAccount = accountRepository.save(new Account(aliceUser, "EUR", BigDecimal.ZERO));
-        Account gbpAccount = accountRepository.save(new Account(aliceUser, "GBP", BigDecimal.ZERO));
+        Account inrAccount = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
+        assertThat(accountRepository.findById(inrAccount.getId())).isPresent();
 
-        assertThat(accountRepository.findById(eurAccount.getId())).isPresent();
-        assertThat(accountRepository.findById(gbpAccount.getId())).isPresent();
+        UUID accountId = UUID.randomUUID();
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
+                        "VALUES (?, ?, 'USD', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
+                accountId, aliceUser.getId(), "ACCT-NON-INR-USD"
+        )).isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_accounts_currency_inr");
     }
 
     @Test
-    @DisplayName("Currency validation: DB CHECK constraint rejects lowercase currency 'usd'")
+    @DisplayName("Currency validation: DB CHECK constraint rejects lowercase currency 'inr'")
     void databaseConstraintRejectsLowercaseCurrency() {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'usd', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
-                accountId, aliceUser.getId(), "ACCT-LOWER-USD"
+                        "VALUES (?, ?, 'inr', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
+                accountId, aliceUser.getId(), "ACCT-LOWER-INR"
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_accounts_currency_format");
+                .hasMessageContaining("chk_accounts_currency_inr");
     }
 
     @Test
-    @DisplayName("Currency validation: DB CHECK constraint rejects 2-letter currency 'US'")
+    @DisplayName("Currency validation: DB CHECK constraint rejects 2-letter currency 'IN'")
     void databaseConstraintRejectsTwoLetterCurrency() {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'US', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
+                        "VALUES (?, ?, 'IN', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
                 accountId, aliceUser.getId(), "ACCT-TWO-LETTER"
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_accounts_currency_format");
+                .hasMessageContaining("chk_accounts_currency_inr");
     }
 
     @Test
-    @DisplayName("Currency validation: DB CHECK constraint rejects invalid characters 'U$D'")
+    @DisplayName("Currency validation: DB CHECK constraint rejects invalid characters 'IN$'")
     void databaseConstraintRejectsSpecialCharacterCurrency() {
         UUID accountId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES (?, ?, 'U$D', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
+                        "VALUES (?, ?, 'IN$', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
                 accountId, aliceUser.getId(), "ACCT-SPECIAL-CHAR"
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_accounts_currency_format");
+                .hasMessageContaining("chk_accounts_currency_inr");
     }
 
     @Test
@@ -288,7 +293,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                         "VALUES (?, ?, '123', 0, 0, NOW(), NOW(), 'USER_CHECKING', 'ACTIVE', ?)",
                 accountId, aliceUser.getId(), "ACCT-NUMERIC-CURRENCY"
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_accounts_currency_format");
+                .hasMessageContaining("chk_accounts_currency_inr");
     }
 
     // =========================================================================
@@ -302,7 +307,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -329,7 +334,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -359,7 +364,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -390,7 +395,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -421,7 +426,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -448,14 +453,14 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Transfer type: Rejects transfer when destination is SYSTEM_CLEARING (400)")
     void transferFailsWhenDestinationIsSystemClearing() throws Exception {
-        Account clearingAccount = Account.createSystemClearingAccount("USD", "SYS-CLEAR-DST");
+        Account clearingAccount = Account.createSystemClearingAccount("INR", "SYS-CLEAR-DST");
         clearingAccount = accountRepository.save(clearingAccount);
 
         TransferRequestDto request = new TransferRequestDto(
                 aliceAccount.getId(),
                 clearingAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -478,7 +483,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Transfer type: Rejects transfer when source is SYSTEM_CLEARING (400)")
     void transferFailsWhenSourceIsSystemClearing() throws Exception {
-        Account clearingAccount = Account.createSystemClearingAccount("USD", "SYS-CLEAR-SRC");
+        Account clearingAccount = Account.createSystemClearingAccount("INR", "SYS-CLEAR-SRC");
         clearingAccount.setBalance(new BigDecimal("1000.0000"));
         clearingAccount = accountRepository.save(clearingAccount);
 
@@ -486,7 +491,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
                 clearingAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -520,14 +525,14 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         List<Account> userChecking = accountRepository.findByAccountType(AccountType.USER_CHECKING);
         assertThat(userChecking).hasSize(2);
 
-        Account clearing = Account.createSystemClearingAccount("USD", "SYS-CLEAR-QUERY");
+        Account clearing = Account.createSystemClearingAccount("INR", "SYS-CLEAR-QUERY");
         accountRepository.save(clearing);
 
         List<Account> clearingAccounts = accountRepository.findByAccountType(AccountType.SYSTEM_CLEARING);
         assertThat(clearingAccounts).hasSize(1);
         assertThat(clearingAccounts.get(0).getAccountNumber()).isEqualTo("SYS-CLEAR-QUERY");
 
-        Optional<Account> byTypeAndCurrency = accountRepository.findByAccountTypeAndCurrency(AccountType.SYSTEM_CLEARING, "USD");
+        Optional<Account> byTypeAndCurrency = accountRepository.findByAccountTypeAndCurrency(AccountType.SYSTEM_CLEARING, "INR");
         assertThat(byTypeAndCurrency).isPresent();
         assertThat(byTypeAndCurrency.get().getAccountNumber()).isEqualTo("SYS-CLEAR-QUERY");
     }
@@ -550,7 +555,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         // Verify entity persistence with the deterministically computed account number
         Account migratedAccount = new Account(
                 aliceUser,
-                "USD",
+                "INR",
                 new BigDecimal("1234.5678"),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -563,6 +568,6 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         assertThat(retrieved.getAccountType()).isEqualTo(AccountType.USER_CHECKING);
         assertThat(retrieved.getStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(retrieved.getBalance()).isEqualByComparingTo("1234.5678");
-        assertThat(retrieved.getCurrency()).isEqualTo("USD");
+        assertThat(retrieved.getCurrency()).isEqualTo("INR");
     }
 }

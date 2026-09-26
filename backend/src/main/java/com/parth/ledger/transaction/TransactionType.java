@@ -8,5 +8,6 @@ package com.parth.ledger.transaction;
 public enum TransactionType {
     TRANSFER,
     DEPOSIT,
-    WITHDRAWAL
+    WITHDRAWAL,
+    SYSTEM_FUNDING
 }

@@ -79,18 +79,18 @@ class TransferRollbackIntegrationTest extends BaseIntegrationTest {
         bobUser = userRepository.save(new User("bob.rollback@ledger.com", "Bob Rollback"));
 
         // Funder account initialized with funds
-        funderAccount = accountRepository.save(new Account(funderUser, "USD", new BigDecimal("100000.0000")));
+        funderAccount = accountRepository.save(new Account(funderUser, "INR", new BigDecimal("100000.0000")));
 
         // Alice and Bob start at 0.0000 and are funded via balanced double-entry transfers
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD"));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD"));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR"));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR"));
 
         // Fund Alice with 1000.0000 and Bob with 500.0000 via authoritative transfers
         executeAsUser("funder.rollback@ledger.com", () -> {
             transferService.executeTransfer("fund-alice-init",
-                    new TransferRequestDto(funderAccount.getId(), aliceAccount.getId(), new BigDecimal("1000.0000"), "USD"));
+                    new TransferRequestDto(funderAccount.getId(), aliceAccount.getId(), new BigDecimal("1000.0000"), "INR"));
             transferService.executeTransfer("fund-bob-init",
-                    new TransferRequestDto(funderAccount.getId(), bobAccount.getId(), new BigDecimal("500.0000"), "USD"));
+                    new TransferRequestDto(funderAccount.getId(), bobAccount.getId(), new BigDecimal("500.0000"), "INR"));
         });
 
         // Verify initial state: Alice has 1000.0000, Bob has 500.0000, both are CONSISTENT
@@ -128,7 +128,7 @@ class TransferRollbackIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("150.0000"),
-                "USD"
+                "INR"
         );
 
         // Execute transfer as Alice: must throw and rollback
@@ -187,7 +187,7 @@ class TransferRollbackIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("200.0000"),
-                "USD"
+                "INR"
         );
 
         // Execute transfer as Alice
@@ -239,7 +239,7 @@ class TransferRollbackIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Step 1: Force failure on attempt 1 during ledger entry write

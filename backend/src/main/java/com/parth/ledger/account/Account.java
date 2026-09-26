@@ -62,25 +62,35 @@ public class Account {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    public static final String PLATFORM_CURRENCY = "INR";
+
     protected Account() {
         // Required by JPA
     }
 
+    public Account(User user) {
+        this(user, PLATFORM_CURRENCY, BigDecimal.ZERO.setScale(4), AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
+    }
+
+    public Account(User user, BigDecimal balance) {
+        this(user, PLATFORM_CURRENCY, balance, AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
+    }
+
     public Account(User user, String currency) {
-        this(user, currency, BigDecimal.ZERO.setScale(4), AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
+        this(user, currency != null ? currency : PLATFORM_CURRENCY, BigDecimal.ZERO.setScale(4), AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
     }
 
     public Account(User user, String currency, BigDecimal balance) {
-        this(user, currency, balance, AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
+        this(user, currency != null ? currency : PLATFORM_CURRENCY, balance, AccountType.USER_CHECKING, AccountStatus.ACTIVE, null);
     }
 
     public Account(User user, String currency, BigDecimal balance, AccountType accountType, AccountStatus status) {
-        this(user, currency, balance, accountType, status, null);
+        this(user, currency != null ? currency : PLATFORM_CURRENCY, balance, accountType, status, null);
     }
 
     public Account(User user, String currency, BigDecimal balance, AccountType accountType, AccountStatus status, String accountNumber) {
         this.user = user;
-        this.currency = currency != null ? currency.trim().toUpperCase(Locale.ROOT) : null;
+        this.currency = currency != null ? currency.trim().toUpperCase(Locale.ROOT) : PLATFORM_CURRENCY;
         this.balance = balance != null ? balance.setScale(4, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(4);
         this.accountType = accountType != null ? accountType : AccountType.USER_CHECKING;
         this.status = status != null ? status : AccountStatus.ACTIVE;
@@ -91,7 +101,17 @@ public class Account {
         Account account = new Account();
         account.accountType = AccountType.SYSTEM_CLEARING;
         account.status = AccountStatus.ACTIVE;
-        account.currency = currency != null ? currency.trim().toUpperCase(Locale.ROOT) : null;
+        account.currency = currency != null ? currency.trim().toUpperCase(Locale.ROOT) : PLATFORM_CURRENCY;
+        account.balance = BigDecimal.ZERO.setScale(4);
+        account.accountNumber = accountNumber != null ? accountNumber : generateAccountNumber();
+        return account;
+    }
+
+    public static Account createSystemTreasuryAccount(String currency, String accountNumber) {
+        Account account = new Account();
+        account.accountType = AccountType.SYSTEM_TREASURY;
+        account.status = AccountStatus.ACTIVE;
+        account.currency = currency != null ? currency.trim().toUpperCase(Locale.ROOT) : PLATFORM_CURRENCY;
         account.balance = BigDecimal.ZERO.setScale(4);
         account.accountNumber = accountNumber != null ? accountNumber : generateAccountNumber();
         return account;
@@ -195,6 +215,10 @@ public class Account {
 
     public boolean isSystemClearing() {
         return this.accountType == AccountType.SYSTEM_CLEARING;
+    }
+
+    public boolean isSystemTreasury() {
+        return this.accountType == AccountType.SYSTEM_TREASURY;
     }
 
     public Long getVersion() {

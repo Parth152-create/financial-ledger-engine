@@ -5,5 +5,6 @@ package com.parth.ledger.account;
  */
 public enum AccountType {
     USER_CHECKING,
-    SYSTEM_CLEARING
+    SYSTEM_CLEARING,
+    SYSTEM_TREASURY
 }

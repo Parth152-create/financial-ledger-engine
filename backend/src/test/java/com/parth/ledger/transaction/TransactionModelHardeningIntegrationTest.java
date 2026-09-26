@@ -84,8 +84,8 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.v3@ledger.com", "Alice V3"));
         bobUser = userRepository.save(new User("bob.v3@ledger.com", "Bob V3"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
     }
 
     @AfterEach
@@ -111,7 +111,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD",
+                "INR",
                 "Payment for services"
         );
 
@@ -132,7 +132,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         UUID txId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, source_account_id, destination_account_id, created_at, transaction_type, initiated_by_user_id) " +
-                        "VALUES (?, ?, 10.0000, 'USD', 'COMPLETED', ?, ?, NOW(), 'REFUND', ?)",
+                        "VALUES (?, ?, 10.0000, 'INR', 'COMPLETED', ?, ?, NOW(), 'REFUND', ?)",
                 txId, "tx-v3-invalid-type", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("chk_transactions_transaction_type");
@@ -149,7 +149,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("75.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -170,7 +170,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         UUID txId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, source_account_id, destination_account_id, created_at, transaction_type, initiated_by_user_id) " +
-                        "VALUES (?, ?, 10.0000, 'USD', 'COMPLETED', ?, ?, NOW(), 'TRANSFER', NULL)",
+                        "VALUES (?, ?, 10.0000, 'INR', 'COMPLETED', ?, ?, NOW(), 'TRANSFER', NULL)",
                 txId, "tx-v3-null-user", aliceAccount.getId(), bobAccount.getId()
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("chk_transactions_initiated_by_user");
@@ -182,7 +182,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         UUID txId = UUID.randomUUID();
         int rows = jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, source_account_id, destination_account_id, created_at, transaction_type, initiated_by_user_id) " +
-                        "VALUES (?, ?, 10.0000, 'USD', 'COMPLETED', ?, ?, NOW(), 'DEPOSIT', NULL)",
+                        "VALUES (?, ?, 10.0000, 'INR', 'COMPLETED', ?, ?, NOW(), 'DEPOSIT', NULL)",
                 txId, "tx-v3-system-deposit", aliceAccount.getId(), bobAccount.getId()
         );
         assertThat(rows).isEqualTo(1);
@@ -199,7 +199,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD",
+                "INR",
                 "Consulting Invoice #2026-09"
         );
 
@@ -221,7 +221,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -246,17 +246,17 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("120.0000"),
-                "USD",
+                "INR",
                 "Ledger currency test"
         );
 
         TransferResponseDto response = transferService.executeTransfer("tx-v3-ledger-curr", request);
-        assertThat(response.currency()).isEqualTo("USD");
+        assertThat(response.currency()).isEqualTo("INR");
 
         List<LedgerEntry> entries = ledgerEntryRepository.findByTransactionId(response.transactionId());
         assertThat(entries).hasSize(2);
         for (LedgerEntry entry : entries) {
-            assertThat(entry.getCurrency()).isEqualTo("USD");
+            assertThat(entry.getCurrency()).isEqualTo("INR");
         }
     }
 
@@ -266,7 +266,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-v3-ledger-constraint",
                 new BigDecimal("10.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.COMPLETED,
                 aliceAccount,
                 bobAccount,
@@ -281,7 +281,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                         "VALUES (?, ?, ?, 'DEBIT', 10.0000, 'usd', NOW())",
                 entryId, tx.getId(), aliceAccount.getId()
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_ledger_entries_currency_format");
+                .hasMessageContaining("chk_ledger_entries_currency_inr");
     }
 
     @Test
@@ -290,7 +290,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-v3-ledger-null-curr",
                 new BigDecimal("10.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.COMPLETED,
                 aliceAccount,
                 bobAccount,
@@ -318,14 +318,14 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         UUID legacyTxId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, source_account_id, destination_account_id, created_at, transaction_type, initiated_by_user_id) " +
-                        "VALUES (?, ?, 200.0000, 'USD', 'COMPLETED', ?, ?, NOW(), 'TRANSFER', ?)",
+                        "VALUES (?, ?, 200.0000, 'INR', 'COMPLETED', ?, ?, NOW(), 'TRANSFER', ?)",
                 legacyTxId, "tx-v3-legacy-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
         );
 
         UUID legacyDebitId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO ledger_entries (id, transaction_id, account_id, entry_type, amount, currency, created_at) " +
-                        "VALUES (?, ?, ?, 'DEBIT', 200.0000, 'USD', NOW())",
+                        "VALUES (?, ?, ?, 'DEBIT', 200.0000, 'INR', NOW())",
                 legacyDebitId, legacyTxId, aliceAccount.getId()
         );
 
@@ -335,7 +335,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         assertThat(loadedTx.getInitiatedByUser().getId()).isEqualTo(aliceUser.getId());
 
         LedgerEntry loadedEntry = ledgerEntryRepository.findById(legacyDebitId).orElseThrow();
-        assertThat(loadedEntry.getCurrency()).isEqualTo("USD");
+        assertThat(loadedEntry.getCurrency()).isEqualTo("INR");
     }
 
     // =========================================================================
@@ -349,7 +349,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("60.0000"),
-                "USD",
+                "INR",
                 "Idempotent memo"
         );
 
@@ -379,7 +379,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("60.0000"),
-                "USD",
+                "INR",
                 "Memo A"
         );
 
@@ -393,7 +393,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("60.0000"),
-                "USD",
+                "INR",
                 "Memo B"
         );
 

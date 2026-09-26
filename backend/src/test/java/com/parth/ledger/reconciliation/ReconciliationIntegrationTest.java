@@ -81,10 +81,10 @@ class ReconciliationIntegrationTest extends BaseIntegrationTest {
         charlieUser = userRepository.save(new User("charlie.recon@ledger.com", "Charlie Recon"));
 
         // Alice serves as funding source for transfers
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("10000.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("10000.0000")));
         // Bob and Charlie start at 0.0000
-        bobAccount = accountRepository.save(new Account(bobUser, "USD"));
-        charlieAccount = accountRepository.save(new Account(charlieUser, "USD"));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR"));
+        charlieAccount = accountRepository.save(new Account(charlieUser, "INR"));
     }
 
     @AfterEach
@@ -275,7 +275,7 @@ class ReconciliationIntegrationTest extends BaseIntegrationTest {
                             aliceAccount.getId(),
                             bobAccount.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (Throwable t) {
@@ -311,7 +311,7 @@ class ReconciliationIntegrationTest extends BaseIntegrationTest {
     @DisplayName("10. Multi-account reconciliation: reconciles all accounts owned by authenticated user")
     void verifyMultiAccountReconciliation() throws Exception {
         // Create second account for Bob
-        Account bobAccount2 = accountRepository.save(new Account(bobUser, "USD"));
+        Account bobAccount2 = accountRepository.save(new Account(bobUser, "INR"));
 
         // Alice funds both accounts
         executeTransferAsAlice("recon-multi-tx-1", aliceAccount.getId(), bobAccount.getId(), new BigDecimal("300.0000"));
@@ -349,7 +349,7 @@ class ReconciliationIntegrationTest extends BaseIntegrationTest {
                 new UsernamePasswordAuthenticationToken("alice.recon@ledger.com", null, Collections.emptyList())
         );
         try {
-            transferService.executeTransfer(idempotencyKey, new TransferRequestDto(sourceId, destId, amount, "USD"));
+            transferService.executeTransfer(idempotencyKey, new TransferRequestDto(sourceId, destId, amount, "INR"));
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -360,7 +360,7 @@ class ReconciliationIntegrationTest extends BaseIntegrationTest {
                 new UsernamePasswordAuthenticationToken("bob.recon@ledger.com", null, Collections.emptyList())
         );
         try {
-            transferService.executeTransfer(idempotencyKey, new TransferRequestDto(sourceId, destId, amount, "USD"));
+            transferService.executeTransfer(idempotencyKey, new TransferRequestDto(sourceId, destId, amount, "INR"));
         } finally {
             SecurityContextHolder.clearContext();
         }

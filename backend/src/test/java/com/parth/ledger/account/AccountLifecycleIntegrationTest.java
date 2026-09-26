@@ -126,8 +126,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice@ledger.com", "Alice"));
         bobUser = userRepository.save(new User("bob@ledger.com", "Bob"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO.setScale(4)));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", BigDecimal.ZERO.setScale(4)));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO.setScale(4)));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO.setScale(4)));
 
         clearingAccount = ensureSystemClearingAccount(new BigDecimal("100000.0000"));
     }
@@ -135,7 +135,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
     private Account ensureSystemClearingAccount(BigDecimal initialBalance) {
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'USD', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
+                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'INR', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
                         "ON CONFLICT (id) DO UPDATE SET balance = EXCLUDED.balance, status = 'ACTIVE'",
                 initialBalance
         );
@@ -159,7 +159,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                 new UsernamePasswordAuthenticationToken(user.getEmail(), null, Collections.emptyList())
         );
         try {
-            depositService.executeDeposit("fund-" + UUID.randomUUID(), new DepositRequestDto(account.getId(), amount, "USD", "Funding"));
+            depositService.executeDeposit("fund-" + UUID.randomUUID(), new DepositRequestDto(account.getId(), amount, "INR", "Funding"));
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -568,7 +568,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
-            withdrawalService.executeWithdrawal("wdr-stmt-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "USD", "Empty"));
+            withdrawalService.executeWithdrawal("wdr-stmt-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "INR", "Empty"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
                             .with(user("alice@ledger.com")))
@@ -603,7 +603,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
-            withdrawalService.executeWithdrawal("wdr-hist-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Empty"));
+            withdrawalService.executeWithdrawal("wdr-hist-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Empty"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
                             .with(user("alice@ledger.com")))
@@ -633,7 +633,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.FROZEN);
             accountRepository.save(aliceAccount);
 
-            TransferRequestDto request = new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "USD");
+            TransferRequestDto request = new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("alice@ledger.com"))
@@ -652,7 +652,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.FROZEN);
             accountRepository.save(aliceAccount);
 
-            TransferRequestDto request = new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("50.0000"), "USD");
+            TransferRequestDto request = new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("50.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("bob@ledger.com"))
@@ -670,7 +670,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.FROZEN);
             accountRepository.save(aliceAccount);
 
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Deposit");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Deposit");
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
@@ -690,7 +690,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.FROZEN);
             accountRepository.save(aliceAccount);
 
-            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "USD", "Cash");
+            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "INR", "Cash");
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
@@ -714,7 +714,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     .andExpect(status().isOk());
 
             // 1. Deposit succeeds
-            DepositRequestDto depositReq = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Dep");
+            DepositRequestDto depositReq = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Dep");
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
                             .header("Idempotency-Key", "dep-unfrz-01")
@@ -723,7 +723,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     .andExpect(status().isCreated());
 
             // 2. Outgoing transfer succeeds
-            TransferRequestDto transferReq = new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("40.0000"), "USD");
+            TransferRequestDto transferReq = new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("40.0000"), "INR");
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("alice@ledger.com"))
                             .header("Idempotency-Key", "tx-unfrz-01")
@@ -732,7 +732,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     .andExpect(status().isOk());
 
             // 3. Withdrawal succeeds
-            WithdrawalRequestDto withdrawalReq = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("30.0000"), "USD", "Wdr");
+            WithdrawalRequestDto withdrawalReq = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("30.0000"), "INR", "Wdr");
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
                             .header("Idempotency-Key", "wdr-unfrz-01")
@@ -752,7 +752,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             fundAccount(bobUser, bobAccount, new BigDecimal("100.0000"));
 
-            TransferRequestDto request = new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("20.0000"), "USD");
+            TransferRequestDto request = new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("20.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("bob@ledger.com"))
@@ -770,7 +770,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.CLOSED);
             accountRepository.save(aliceAccount);
 
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "USD", "Dep");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("50.0000"), "INR", "Dep");
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
@@ -788,7 +788,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             aliceAccount.setStatus(AccountStatus.CLOSED);
             accountRepository.save(aliceAccount);
 
-            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("10.0000"), "USD", "Wdr");
+            WithdrawalRequestDto request = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("10.0000"), "INR", "Wdr");
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
@@ -844,7 +844,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     transferService.executeTransfer("tx-conc-frz-01",
-                            new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "USD"));
+                            new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "INR"));
                     transferSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -902,7 +902,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     depositService.executeDeposit("dep-conc-frz-01",
-                            new DepositRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "USD", "Dep"));
+                            new DepositRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "INR", "Dep"));
                     depositSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -961,7 +961,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     withdrawalService.executeWithdrawal("wdr-conc-frz-01",
-                            new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Cash"));
+                            new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Cash"));
                     withdrawalSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -1019,7 +1019,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     transferService.executeTransfer("tx-conc-cls-src-01",
-                            new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "USD"));
+                            new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "INR"));
                     transferSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -1080,7 +1080,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     transferService.executeTransfer("tx-conc-cls-dst-01",
-                            new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("50.0000"), "USD"));
+                            new TransferRequestDto(bobAccount.getId(), aliceAccount.getId(), new BigDecimal("50.0000"), "INR"));
                     transferSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -1139,7 +1139,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     depositService.executeDeposit("dep-conc-cls-01",
-                            new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Dep"));
+                            new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Dep"));
                     depositSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -1198,7 +1198,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
                     );
                     startLatch.await();
                     withdrawalService.executeWithdrawal("wdr-conc-exact-01",
-                            new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Empty"));
+                            new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Empty"));
                     withdrawalSucceeded.set(true);
                 } catch (Exception ignored) {
                 } finally {
@@ -1339,7 +1339,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             UUID testId = UUID.randomUUID();
             assertThatThrownBy(() -> jdbcTemplate.update(
                     "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                            "VALUES (?, ?, 'USD', 100.0000, 0, NOW(), NOW(), 'USER_CHECKING', 'CLOSED', ?)",
+                            "VALUES (?, ?, 'INR', 100.0000, 0, NOW(), NOW(), 'USER_CHECKING', 'CLOSED', ?)",
                     testId, aliceUser.getId(), "ACCT-DB-CHK-01"
             )).isInstanceOf(DataIntegrityViolationException.class)
                     .hasMessageContaining("chk_accounts_closed_zero_balance");

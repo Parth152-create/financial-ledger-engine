@@ -19,6 +19,7 @@ import com.parth.ledger.ledger.LedgerEntryType;
 import com.parth.ledger.reconciliation.ReconciliationStatus;
 import com.parth.ledger.reconciliation.dto.ReconciliationResultDto;
 import com.parth.ledger.reconciliation.service.ReconciliationService;
+import com.parth.ledger.system.SystemFundingService;
 import com.parth.ledger.transaction.Transaction;
 import com.parth.ledger.transaction.TransactionRepository;
 import com.parth.ledger.transaction.TransactionStatus;
@@ -93,6 +94,9 @@ class DepositIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private SystemFundingService systemFundingService;
+
     @MockitoSpyBean
     private LedgerEntryRepository ledgerEntryRepository;
 
@@ -127,8 +131,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.deposit@ledger.com", "Alice"));
         bobUser = userRepository.save(new User("bob.deposit@ledger.com", "Bob"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", BigDecimal.ZERO.setScale(4)));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", BigDecimal.ZERO.setScale(4)));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO.setScale(4)));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO.setScale(4)));
 
         clearingAccount = ensureSystemClearingAccount(INITIAL_CLEARING_BALANCE);
     }
@@ -146,13 +150,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
     }
 
     private Account ensureSystemClearingAccount(BigDecimal initialBalance) {
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'USD', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
-                        "ON CONFLICT (id) DO UPDATE SET balance = EXCLUDED.balance, status = 'ACTIVE'",
-                initialBalance
-        );
-        return accountRepository.findById(DepositService.SYSTEM_CLEARING_ACCOUNT_ID).orElseThrow();
+        return systemFundingService.bootstrapSystemFunding(initialBalance);
     }
 
     private <T> T executeAsUser(String email, Supplier<T> action) {
@@ -179,7 +177,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD",
+                    "INR",
                     "Initial funding"
             );
 
@@ -199,7 +197,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD",
+                    "INR",
                     "Funding"
             );
 
@@ -218,7 +216,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
@@ -238,7 +236,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("150.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
@@ -256,7 +254,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @DisplayName("5. User balance increases correctly")
         void userBalanceIncreasesCorrectly() {
             BigDecimal depositAmount = new BigDecimal("250.0000");
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "INR");
 
             executeAsUser("alice.deposit@ledger.com", () -> depositService.executeDeposit("dep-bal-005", request));
 
@@ -268,7 +266,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @DisplayName("6. Clearing balance decreases correctly")
         void clearingBalanceDecreasesCorrectly() {
             BigDecimal depositAmount = new BigDecimal("250.0000");
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "INR");
 
             executeAsUser("alice.deposit@ledger.com", () -> depositService.executeDeposit("dep-clr-006", request));
 
@@ -279,7 +277,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("7. Transaction is COMPLETED")
         void transactionIsCompleted() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-status-007", request));
@@ -295,7 +293,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("8. Exactly two ledger entries are created")
         void exactlyTwoLedgerEntriesCreated() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-entries-008", request));
@@ -308,7 +306,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @DisplayName("9. Debit equals credit")
         void debitEqualsCredit() {
             BigDecimal amount = new BigDecimal("175.5000");
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), amount, "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), amount, "INR");
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-balance-009", request));
@@ -334,16 +332,16 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("10. Currencies are correct")
         void currenciesAreCorrect() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-curr-010", request));
 
-            assertThat(response.currency()).isEqualTo("USD");
+            assertThat(response.currency()).isEqualTo("INR");
 
             List<LedgerEntry> entries = ledgerEntryRepository.findByTransactionId(response.transactionId());
             for (LedgerEntry entry : entries) {
-                assertThat(entry.getCurrency()).isEqualTo("USD");
+                assertThat(entry.getCurrency()).isEqualTo("INR");
             }
         }
 
@@ -351,7 +349,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @DisplayName("11. Description persists")
         void descriptionPersists() {
             String desc = "Payroll deposit for September";
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", desc);
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", desc);
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-desc-011", request));
@@ -365,7 +363,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("12. Blank description becomes null")
         void blankDescriptionBecomesNull() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "   ");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "   ");
 
             TransactionResponseDto response = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-desc-012", request));
@@ -387,7 +385,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("13. Zero amount rejected")
         void zeroAmountRejected() throws Exception {
-            String payload = String.format("{\"accountId\": \"%s\", \"amount\": 0.00, \"currency\": \"USD\"}",
+            String payload = String.format("{\"accountId\": \"%s\", \"amount\": 0.00, \"currency\": \"INR\"}",
                     aliceAccount.getId());
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -400,13 +398,13 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(transactionRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
         }
 
         @Test
         @DisplayName("14. Negative amount rejected")
         void negativeAmountRejected() throws Exception {
-            String payload = String.format("{\"accountId\": \"%s\", \"amount\": -50.00, \"currency\": \"USD\"}",
+            String payload = String.format("{\"accountId\": \"%s\", \"amount\": -50.00, \"currency\": \"INR\"}",
                     aliceAccount.getId());
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -419,13 +417,13 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(transactionRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
         }
 
         @Test
         @DisplayName("15. Malformed amount rejected")
         void malformedAmountRejected() throws Exception {
-            String payload = String.format("{\"accountId\": \"%s\", \"amount\": \"not-a-number\", \"currency\": \"USD\"}",
+            String payload = String.format("{\"accountId\": \"%s\", \"amount\": \"not-a-number\", \"currency\": \"INR\"}",
                     aliceAccount.getId());
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -466,34 +464,20 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("17. Currency mismatch rejected")
+        @DisplayName("17. Non-INR currency deposit rejected")
         void currencyMismatchRejected() throws Exception {
-            // EUR account for Alice
-            Account aliceEur = accountRepository.save(new Account(aliceUser, "EUR", BigDecimal.ZERO));
+            for (String curr : new String[]{"USD", "EUR"}) {
+                DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), curr);
 
-            // Request EUR for EUR destination -> mismatches USD SYSTEM_CLEARING
-            DepositRequestDto requestEur = new DepositRequestDto(aliceEur.getId(), new BigDecimal("100.0000"), "EUR");
-
-            mockMvc.perform(post("/api/v1/deposits")
-                            .with(user("alice.deposit@ledger.com"))
-                            .header("Idempotency-Key", "dep-val-017a")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestEur)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status", is(400)))
-                    .andExpect(jsonPath("$.message", containsString("Currency mismatch")));
-
-            // Request USD for EUR destination -> mismatches destination currency
-            DepositRequestDto requestUsdOnEur = new DepositRequestDto(aliceEur.getId(), new BigDecimal("100.0000"), "USD");
-
-            mockMvc.perform(post("/api/v1/deposits")
-                            .with(user("alice.deposit@ledger.com"))
-                            .header("Idempotency-Key", "dep-val-017b")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestUsdOnEur)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status", is(400)))
-                    .andExpect(jsonPath("$.message", containsString("Currency mismatch")));
+                mockMvc.perform(post("/api/v1/deposits")
+                                .with(user("alice.deposit@ledger.com"))
+                                .header("Idempotency-Key", "dep-val-017-" + curr)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.status", is(400)))
+                        .andExpect(jsonPath("$.message", containsString("Only INR currency is supported: " + curr)));
+            }
         }
 
         @Test
@@ -502,7 +486,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     DepositService.SYSTEM_CLEARING_ACCOUNT_ID,
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -524,7 +508,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -539,8 +523,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             // Balance unchanged
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(transactionRepository.count()).isZero();
-            assertThat(ledgerEntryRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).isEmpty();
         }
 
         @Test
@@ -552,7 +536,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -567,8 +551,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             // Balance unchanged
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(transactionRepository.count()).isZero();
-            assertThat(ledgerEntryRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).isEmpty();
         }
 
         @Test
@@ -578,7 +562,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     bobAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -592,7 +576,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             assertThat(accountRepository.findById(bobAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(transactionRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
         }
 
         @Test
@@ -601,7 +585,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -617,7 +601,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -631,7 +615,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("24. Missing accountId rejected (400)")
         void missingAccountIdRejected() throws Exception {
-            String payload = "{\"amount\": 100.00, \"currency\": \"USD\"}";
+            String payload = "{\"amount\": 100.00, \"currency\": \"INR\"}";
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
@@ -660,7 +644,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             mockMvc.perform(post("/api/v1/deposits")
@@ -681,7 +665,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.deposit@ledger.com",
@@ -701,7 +685,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.deposit@ledger.com",
@@ -722,7 +706,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.deposit@ledger.com",
@@ -730,7 +714,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
                     .isInstanceOf(InsufficientBalanceException.class);
 
             assertThat(transactionRepository.findByIdempotencyKey("dep-clr-028")).isEmpty();
-            assertThat(transactionRepository.count()).isZero();
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).isEmpty();
         }
 
         @Test
@@ -741,14 +725,14 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             assertThatThrownBy(() -> executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-clr-029", request)))
                     .isInstanceOf(InsufficientBalanceException.class);
 
-            assertThat(ledgerEntryRepository.count()).isZero();
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).isEmpty();
         }
     }
 
@@ -765,7 +749,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD",
+                    "INR",
                     "Idempotent funding"
             );
 
@@ -803,7 +787,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             DepositRequestDto request = new DepositRequestDto(
                     aliceAccount.getId(),
                     new BigDecimal("100.0000"),
-                    "USD"
+                    "INR"
             );
 
             TransactionResponseDto r1 = executeAsUser("alice.deposit@ledger.com",
@@ -819,16 +803,16 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             assertThat(checkAlice.getBalance()).isEqualByComparingTo(new BigDecimal("100.0000"));
             assertThat(checkClearing.getBalance()).isEqualByComparingTo(INITIAL_CLEARING_BALANCE.subtract(new BigDecimal("100.0000")));
 
-            // Exactly 1 transaction row and 2 ledger entries
-            assertThat(transactionRepository.count()).isEqualTo(1);
-            assertThat(ledgerEntryRepository.count()).isEqualTo(2);
+            // Exactly 1 deposit transaction and 1 user ledger entry
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).hasSize(1);
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).hasSize(1);
         }
 
         @Test
         @DisplayName("32. Same key with different amount returns 409 Conflict")
         void sameKeyWithDifferentAmountReturns409() throws Exception {
-            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
-            DepositRequestDto req2 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "USD");
+            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
+            DepositRequestDto req2 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
@@ -850,10 +834,10 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("33. Same key with different account returns 409 Conflict")
         void sameKeyWithDifferentAccountReturns409() throws Exception {
-            Account aliceSecondAccount = accountRepository.save(new Account(aliceUser, "USD"));
+            Account aliceSecondAccount = accountRepository.save(new Account(aliceUser, "INR"));
 
-            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
-            DepositRequestDto req2 = new DepositRequestDto(aliceSecondAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
+            DepositRequestDto req2 = new DepositRequestDto(aliceSecondAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
@@ -873,9 +857,9 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("34. Same key with different currency returns 409 Conflict")
+        @DisplayName("34. Replay with non-INR currency is rejected as invalid currency (400)")
         void sameKeyWithDifferentCurrencyReturns409() {
-            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-idem-034", req1));
@@ -885,14 +869,15 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             assertThatThrownBy(() -> executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-idem-034", req2)))
-                    .isInstanceOf(IdempotencyConflictException.class);
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Only INR currency is supported: EUR");
         }
 
         @Test
         @DisplayName("35. Same key with different description returns 409 Conflict")
         void sameKeyWithDifferentDescriptionReturns409() throws Exception {
-            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Desc 1");
-            DepositRequestDto req2 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD", "Desc 2");
+            DepositRequestDto req1 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Desc 1");
+            DepositRequestDto req2 = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Desc 2");
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
@@ -913,7 +898,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("36. Redis unavailable falls back to PostgreSQL")
         void redisUnavailableFallsBackToPostgres() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             TransactionResponseDto first = executeAsUser("alice.deposit@ledger.com",
                     () -> depositService.executeDeposit("dep-idem-036", request));
@@ -932,7 +917,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("37. Redis failure after commit does not roll back deposit")
         void redisFailureAfterCommitDoesNotRollbackDeposit() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             // Mock Redis failure during post-commit caching
             doThrow(new RedisConnectionFailureException("Simulated Redis post-commit write failure"))
@@ -949,8 +934,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             // DB transaction committed successfully
             Account checkAlice = accountRepository.findById(aliceAccount.getId()).orElseThrow();
             assertThat(checkAlice.getBalance()).isEqualByComparingTo(new BigDecimal("100.0000"));
-            assertThat(transactionRepository.count()).isEqualTo(initialTxCount + 1);
-            assertThat(ledgerEntryRepository.count()).isEqualTo(2);
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).hasSize(1);
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).hasSize(1);
 
             // Retry via PostgreSQL fallback succeeds
             TransactionResponseDto retry = executeAsUser("alice.deposit@ledger.com",
@@ -969,7 +954,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("38. Failure during transaction rolls back balance changes")
         void failureDuringTransactionRollsBackBalances() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             // Throw exception during ledger entry persistence
             doThrow(new RuntimeException("Simulated database constraint/trigger failure on ledger insert"))
@@ -989,7 +974,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("39. Failure before ledger persistence rolls back")
         void failureBeforeLedgerPersistenceRollsBack() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             doThrow(new RuntimeException("Simulated failure before ledger entries"))
                     .when(ledgerEntryRepository).save(any(LedgerEntry.class));
@@ -999,13 +984,13 @@ class DepositIntegrationTest extends BaseIntegrationTest {
                     .isInstanceOf(RuntimeException.class);
 
             assertThat(transactionRepository.findByIdempotencyKey("dep-fail-039")).isEmpty();
-            assertThat(ledgerEntryRepository.count()).isZero();
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).isEmpty();
         }
 
         @Test
         @DisplayName("40. Failure after balance mutation rolls back")
         void failureAfterBalanceMutationRollsBack() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             doThrow(new RuntimeException("Simulated failure after balance update"))
                     .when(ledgerEntryRepository).save(any(LedgerEntry.class));
@@ -1021,7 +1006,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("41. Retry after rollback succeeds once")
         void retryAfterRollbackSucceedsOnce() {
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR");
 
             // First attempt fails
             doThrow(new RuntimeException("Transient failure"))
@@ -1043,8 +1028,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             Account checkAlice = accountRepository.findById(aliceAccount.getId()).orElseThrow();
             assertThat(checkAlice.getBalance()).isEqualByComparingTo(new BigDecimal("100.0000"));
-            assertThat(transactionRepository.count()).isEqualTo(1);
-            assertThat(ledgerEntryRepository.count()).isEqualTo(2);
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).hasSize(1);
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).hasSize(1);
         }
     }
 
@@ -1073,7 +1058,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
                         DepositRequestDto request = new DepositRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD",
+                                "INR",
                                 "Concurrent deposit " + idx
                         );
                         executeAsUser("alice.deposit@ledger.com",
@@ -1101,8 +1086,8 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             assertThat(checkAlice.getBalance()).isEqualByComparingTo(expectedTotal);
             assertThat(checkClearing.getBalance()).isEqualByComparingTo(INITIAL_CLEARING_BALANCE.subtract(expectedTotal));
 
-            assertThat(transactionRepository.count()).isEqualTo(threadCount);
-            assertThat(ledgerEntryRepository.count()).isEqualTo(threadCount * 2L);
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).hasSize(threadCount);
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).hasSize(threadCount);
         }
 
         @Test
@@ -1128,7 +1113,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
                         DepositRequestDto request = new DepositRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD"
+                                "INR"
                         );
                         executeAsUser("alice.deposit@ledger.com",
                                 () -> depositService.executeDeposit("dep-conc-43-" + idx, request));
@@ -1165,7 +1150,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             int threadCount = 10;
             String sharedKey = "dep-conc-idem-shared";
             BigDecimal depositAmount = new BigDecimal("100.0000");
-            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "USD");
+            DepositRequestDto request = new DepositRequestDto(aliceAccount.getId(), depositAmount, "INR");
 
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
             CountDownLatch startLatch = new CountDownLatch(1);
@@ -1202,27 +1187,13 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             assertThat(checkAlice.getBalance()).isEqualByComparingTo(depositAmount);
             assertThat(checkClearing.getBalance()).isEqualByComparingTo(INITIAL_CLEARING_BALANCE.subtract(depositAmount));
-            assertThat(transactionRepository.count()).isEqualTo(1);
-            assertThat(ledgerEntryRepository.count()).isEqualTo(2);
+            assertThat(transactionRepository.findByTransactionType(TransactionType.DEPOSIT)).hasSize(1);
+            assertThat(ledgerEntryRepository.findByAccountId(aliceAccount.getId())).hasSize(1);
         }
 
         @Test
         @DisplayName("45. Concurrent deposits reconcile correctly")
         void concurrentDepositsReconcileCorrectly() throws Exception {
-            // Seed initial credit for clearing account so its ledger balance matches snapshot balance
-            Transaction initTx = transactionRepository.save(new Transaction(
-                    "init-clearing-recon-seed",
-                    INITIAL_CLEARING_BALANCE,
-                    "USD",
-                    TransactionStatus.COMPLETED,
-                    clearingAccount,
-                    bobAccount,
-                    TransactionType.DEPOSIT,
-                    null,
-                    "Initial platform clearing funding"
-            ));
-            ledgerEntryRepository.save(new LedgerEntry(initTx, clearingAccount, LedgerEntryType.CREDIT, INITIAL_CLEARING_BALANCE, "USD"));
-
             int threadCount = 8;
             BigDecimal amountPerThread = new BigDecimal("75.0000");
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -1237,7 +1208,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
                         DepositRequestDto request = new DepositRequestDto(
                                 aliceAccount.getId(),
                                 amountPerThread,
-                                "USD"
+                                "INR"
                         );
                         executeAsUser("alice.deposit@ledger.com",
                                 () -> depositService.executeDeposit("dep-recon-conc-" + idx, request));

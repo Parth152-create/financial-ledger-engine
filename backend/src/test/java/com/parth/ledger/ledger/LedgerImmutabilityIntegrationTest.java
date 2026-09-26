@@ -78,8 +78,8 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.v4@ledger.com", "Alice V4"));
         bobUser = userRepository.save(new User("bob.v4@ledger.com", "Bob V4"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(aliceUser.getEmail(), null, Collections.emptyList())
@@ -104,7 +104,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-immutability-insert-01",
                 new BigDecimal("150.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 aliceAccount,
                 bobAccount,
@@ -118,13 +118,13 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount,
                 LedgerEntryType.DEBIT,
                 new BigDecimal("150.0000"),
-                "USD"
+                "INR"
         );
         LedgerEntry savedEntry = ledgerEntryRepository.save(entry);
 
         assertThat(savedEntry.getId()).isNotNull();
         assertThat(savedEntry.getAmount()).isEqualByComparingTo(new BigDecimal("150.0000"));
-        assertThat(savedEntry.getCurrency()).isEqualTo("USD");
+        assertThat(savedEntry.getCurrency()).isEqualTo("INR");
         assertThat(savedEntry.getEntryType()).isEqualTo(LedgerEntryType.DEBIT);
         assertThat(savedEntry.getAccount().getId()).isEqualTo(aliceAccount.getId());
         assertThat(savedEntry.getTransaction().getId()).isEqualTo(tx.getId());
@@ -137,7 +137,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-immutability-update-01",
                 new BigDecimal("200.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 aliceAccount,
                 bobAccount
@@ -147,7 +147,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount,
                 LedgerEntryType.DEBIT,
                 new BigDecimal("200.0000"),
-                "USD"
+                "INR"
         ));
 
         // Attempt direct SQL update to verify database trigger rejects it
@@ -171,7 +171,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-immutability-delete-01",
                 new BigDecimal("75.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 aliceAccount,
                 bobAccount
@@ -181,7 +181,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount,
                 LedgerEntryType.DEBIT,
                 new BigDecimal("75.0000"),
-                "USD"
+                "INR"
         ));
 
         // Attempt direct SQL DELETE to verify database trigger rejects it
@@ -203,7 +203,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
         Transaction tx = transactionRepository.save(new Transaction(
                 "tx-immutability-delete-repo-01",
                 new BigDecimal("85.0000"),
-                "USD",
+                "INR",
                 TransactionStatus.PENDING,
                 aliceAccount,
                 bobAccount
@@ -213,7 +213,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount,
                 LedgerEntryType.DEBIT,
                 new BigDecimal("85.0000"),
-                "USD"
+                "INR"
         ));
 
         // Attempt deletion via Spring Data JPA repository - must trigger database rejection
@@ -237,7 +237,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD",
+                "INR",
                 "Normal transfer with immutability active"
         );
 
@@ -261,7 +261,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("250.0000"),
-                "USD",
+                "INR",
                 "Balanced transfer entries test"
         );
 
@@ -276,7 +276,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
         assertThat(debitEntry.getAccount().getId()).isEqualTo(aliceAccount.getId());
         assertThat(debitEntry.getAmount()).isEqualByComparingTo(new BigDecimal("250.0000"));
-        assertThat(debitEntry.getCurrency()).isEqualTo("USD");
+        assertThat(debitEntry.getCurrency()).isEqualTo("INR");
 
         LedgerEntry creditEntry = entries.stream()
                 .filter(e -> e.getEntryType() == LedgerEntryType.CREDIT)
@@ -284,7 +284,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
         assertThat(creditEntry.getAccount().getId()).isEqualTo(bobAccount.getId());
         assertThat(creditEntry.getAmount()).isEqualByComparingTo(new BigDecimal("250.0000"));
-        assertThat(creditEntry.getCurrency()).isEqualTo("USD");
+        assertThat(creditEntry.getCurrency()).isEqualTo("INR");
 
         assertThat(debitEntry.getAmount()).isEqualByComparingTo(creditEntry.getAmount());
     }
@@ -299,7 +299,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
             Transaction tx = transactionRepository.save(new Transaction(
                     "tx-v4-rollback-01",
                     new BigDecimal("50.0000"),
-                    "USD",
+                    "INR",
                     TransactionStatus.PENDING,
                     aliceAccount,
                     bobAccount
@@ -310,7 +310,7 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
                     aliceAccount,
                     LedgerEntryType.DEBIT,
                     new BigDecimal("50.0000"),
-                    "USD"
+                    "INR"
             );
             LedgerEntry saved = ledgerEntryRepository.save(entry);
 
@@ -336,10 +336,10 @@ class LedgerImmutabilityIntegrationTest extends BaseIntegrationTest {
 
         // Execute two transfers: 100 USD and 50 USD from Alice to Bob
         transferService.executeTransfer("tx-v4-recon-01", new TransferRequestDto(
-                aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "USD", "Transfer 1"
+                aliceAccount.getId(), bobAccount.getId(), new BigDecimal("100.0000"), "INR", "Transfer 1"
         ));
         transferService.executeTransfer("tx-v4-recon-02", new TransferRequestDto(
-                aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "USD", "Transfer 2"
+                aliceAccount.getId(), bobAccount.getId(), new BigDecimal("50.0000"), "INR", "Transfer 2"
         ));
 
         // Reconcile Bob's account as Bob (initial 0.0000 balance + 150.0000 credits = 150.0000)

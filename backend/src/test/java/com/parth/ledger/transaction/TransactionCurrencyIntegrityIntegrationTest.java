@@ -71,9 +71,9 @@ class TransactionCurrencyIntegrityIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.v11@ledger.com", "Alice V11"));
         bobUser = userRepository.save(new User("bob.v11@ledger.com", "Bob V11"));
 
-        aliceAccount = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("100.0000"),
+        aliceAccount = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("100.0000"),
                 AccountType.USER_CHECKING, AccountStatus.ACTIVE, "ACCT-V11-ALICE-01"));
-        bobAccount = accountRepository.save(new Account(bobUser, "USD", BigDecimal.ZERO,
+        bobAccount = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO,
                 AccountType.USER_CHECKING, AccountStatus.ACTIVE, "ACCT-V11-BOB-01"));
     }
 
@@ -89,31 +89,43 @@ class TransactionCurrencyIntegrityIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("1. Valid 3-letter uppercase currency (e.g. USD) succeeds at database layer")
+    @DisplayName("1. Valid INR currency succeeds at database layer")
     void validUppercaseCurrencySucceeds() {
         UUID txId = UUID.randomUUID();
         int rows = jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, transaction_type, source_account_id, destination_account_id, initiated_by_user_id, created_at) " +
-                        "VALUES (?, ?, 10.0000, 'USD', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
+                        "VALUES (?, ?, 10.0000, 'INR', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
                 txId, "key-v6-valid-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
         );
         assertThat(rows).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("2. Lowercase currency (e.g. 'usd') is rejected by chk_transactions_currency_format")
+    @DisplayName("2. Non-INR currency (e.g. 'USD') is rejected by chk_transactions_currency_inr")
+    void nonInrCurrencyRejectedByDatabaseConstraint() {
+        UUID txId = UUID.randomUUID();
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO transactions (id, idempotency_key, amount, currency, status, transaction_type, source_account_id, destination_account_id, initiated_by_user_id, created_at) " +
+                        "VALUES (?, ?, 10.0000, 'USD', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
+                txId, "key-v6-usd-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
+        )).isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_transactions_currency_inr");
+    }
+
+    @Test
+    @DisplayName("3. Lowercase currency (e.g. 'inr') is rejected by chk_transactions_currency_inr")
     void lowercaseCurrencyRejectedByDatabaseConstraint() {
         UUID txId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO transactions (id, idempotency_key, amount, currency, status, transaction_type, source_account_id, destination_account_id, initiated_by_user_id, created_at) " +
-                        "VALUES (?, ?, 10.0000, 'usd', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
+                        "VALUES (?, ?, 10.0000, 'inr', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
                 txId, "key-v6-lowercase-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_transactions_currency_format");
+                .hasMessageContaining("chk_transactions_currency_inr");
     }
 
     @Test
-    @DisplayName("3. Non-alphabetic 3-character currency (e.g. '123') is rejected by chk_transactions_currency_format")
+    @DisplayName("4. Non-alphabetic / short currency is rejected by chk_transactions_currency_inr")
     void numericCurrencyRejectedByDatabaseConstraint() {
         UUID txId = UUID.randomUUID();
         assertThatThrownBy(() -> jdbcTemplate.update(
@@ -121,19 +133,7 @@ class TransactionCurrencyIntegrityIntegrationTest extends BaseIntegrationTest {
                         "VALUES (?, ?, 10.0000, '123', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
                 txId, "key-v6-numeric-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
         )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_transactions_currency_format");
-    }
-
-    @Test
-    @DisplayName("4. Short currency (e.g. 'US') is rejected by chk_transactions_currency_format")
-    void shortCurrencyRejectedByDatabaseConstraint() {
-        UUID txId = UUID.randomUUID();
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                "INSERT INTO transactions (id, idempotency_key, amount, currency, status, transaction_type, source_account_id, destination_account_id, initiated_by_user_id, created_at) " +
-                        "VALUES (?, ?, 10.0000, 'US', 'COMPLETED', 'TRANSFER', ?, ?, ?, NOW())",
-                txId, "key-v6-short-01", aliceAccount.getId(), bobAccount.getId(), aliceUser.getId()
-        )).isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_transactions_currency_format");
+                .hasMessageContaining("chk_transactions_currency_inr");
     }
 
     @Test

@@ -52,6 +52,9 @@ public class AccountService {
         if (currency == null || !currency.matches("^[A-Z]{3}$")) {
             throw new IllegalArgumentException("Currency must be exactly 3 uppercase alphabetic characters (ISO 4217)");
         }
+        if (!"INR".equals(currency.trim().toUpperCase(java.util.Locale.ROOT))) {
+            throw new IllegalArgumentException("Only INR currency is supported: " + currency);
+        }
 
         User currentUser = authenticatedUserService.getCurrentUser();
 

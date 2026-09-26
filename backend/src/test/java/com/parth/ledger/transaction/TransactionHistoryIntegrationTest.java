@@ -9,6 +9,7 @@ import com.parth.ledger.deposit.dto.DepositRequestDto;
 import com.parth.ledger.deposit.service.DepositService;
 import com.parth.ledger.ledger.LedgerEntry;
 import com.parth.ledger.ledger.LedgerEntryRepository;
+import com.parth.ledger.system.SystemFundingService;
 import com.parth.ledger.transaction.dto.TransactionDirection;
 import com.parth.ledger.transaction.dto.TransactionHistoryItemDto;
 import com.parth.ledger.transaction.dto.TransactionHistoryPageResponseDto;
@@ -71,6 +72,9 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TransferService transferService;
 
+    @Autowired
+    private SystemFundingService systemFundingService;
+
     private User aliceUser;
     private User bobUser;
     private User charlieUser;
@@ -96,7 +100,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
 
         aliceAccount = accountRepository.save(new Account(
                 aliceUser,
-                "USD",
+                "INR",
                 new BigDecimal("5000.0000"),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -105,7 +109,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
 
         bobAccount = accountRepository.save(new Account(
                 bobUser,
-                "USD",
+                "INR",
                 new BigDecimal("2000.0000"),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -127,13 +131,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private Account ensureSystemClearingAccount(BigDecimal initialBalance) {
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'USD', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
-                        "ON CONFLICT (id) DO UPDATE SET balance = EXCLUDED.balance, status = 'ACTIVE'",
-                initialBalance
-        );
-        return accountRepository.findById(DepositService.SYSTEM_CLEARING_ACCOUNT_ID).orElseThrow();
+        return systemFundingService.bootstrapSystemFunding(initialBalance);
     }
 
     private Transaction insertTransaction(
@@ -183,7 +181,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 clearingAccount,
                 aliceAccount,
                 new BigDecimal("500.0000"),
-                "USD",
+                "INR",
                 TransactionType.DEPOSIT,
                 TransactionStatus.COMPLETED,
                 null,
@@ -200,7 +198,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.content[0].transactionType", is("DEPOSIT")))
                 .andExpect(jsonPath("$.content[0].direction", is("CREDIT")))
                 .andExpect(jsonPath("$.content[0].amount", is(500.0)))
-                .andExpect(jsonPath("$.content[0].currency", is("USD")))
+                .andExpect(jsonPath("$.content[0].currency", is("INR")))
                 .andExpect(jsonPath("$.content[0].description", is("Direct funding")))
                 .andExpect(jsonPath("$.content[0].status", is("COMPLETED")))
                 .andExpect(jsonPath("$.content[0].sourceAccountId", is(clearingAccount.getId().toString())))
@@ -218,7 +216,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     void test02_emptyHistoryReturnsEmptyContentWith200() throws Exception {
         Account freshAccount = accountRepository.save(new Account(
                 aliceUser,
-                "USD",
+                "INR",
                 BigDecimal.ZERO.setScale(4),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -249,9 +247,9 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         UUID id2 = UUID.randomUUID();
         UUID id3 = UUID.randomUUID();
 
-        insertTransaction(id1, "k1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
-        insertTransaction(id2, "k2", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
-        insertTransaction(id3, "k3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
+        insertTransaction(id1, "k1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
+        insertTransaction(id2, "k2", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
+        insertTransaction(id3, "k3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -271,8 +269,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         UUID lowId = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID highId = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-        insertTransaction(lowId, "tie-low", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Low", sameTimestamp, sameTimestamp);
-        insertTransaction(highId, "tie-high", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "High", sameTimestamp, sameTimestamp);
+        insertTransaction(lowId, "tie-low", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Low", sameTimestamp, sameTimestamp);
+        insertTransaction(highId, "tie-high", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "High", sameTimestamp, sameTimestamp);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -293,7 +291,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                     aliceAccount,
                     bobAccount,
                     new BigDecimal("10.0000"),
-                    "USD",
+                    "INR",
                     TransactionType.TRANSFER,
                     TransactionStatus.COMPLETED,
                     aliceUser,
@@ -359,7 +357,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                     aliceAccount,
                     bobAccount,
                     new BigDecimal("10.0000"),
-                    "USD",
+                    "INR",
                     TransactionType.TRANSFER,
                     TransactionStatus.COMPLETED,
                     aliceUser,
@@ -394,7 +392,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                     aliceAccount,
                     bobAccount,
                     new BigDecimal("1.0000"),
-                    "USD",
+                    "INR",
                     TransactionType.TRANSFER,
                     TransactionStatus.COMPLETED,
                     aliceUser,
@@ -467,7 +465,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
         Account charlieAccount = accountRepository.save(new Account(
                 charlieUser,
-                "USD",
+                "INR",
                 new BigDecimal("1000.0000"),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -481,7 +479,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 bobAccount,
                 charlieAccount,
                 new BigDecimal("50.0000"),
-                "USD",
+                "INR",
                 TransactionType.TRANSFER,
                 TransactionStatus.COMPLETED,
                 bobUser,
@@ -558,7 +556,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 aliceAccount,
                 bobAccount,
                 new BigDecimal("100.0000"),
-                "USD",
+                "INR",
                 TransactionType.TRANSFER,
                 TransactionStatus.COMPLETED,
                 aliceUser,
@@ -586,7 +584,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 bobAccount,
                 aliceAccount,
                 new BigDecimal("150.0000"),
-                "USD",
+                "INR",
                 TransactionType.TRANSFER,
                 TransactionStatus.COMPLETED,
                 bobUser,
@@ -614,7 +612,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 clearingAccount,
                 aliceAccount,
                 new BigDecimal("500.0000"),
-                "USD",
+                "INR",
                 TransactionType.DEPOSIT,
                 TransactionStatus.COMPLETED,
                 null,
@@ -641,8 +639,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("17. Filter by transactionType = TRANSFER works")
     void test17_filterByTransactionTypeTransfer() throws Exception {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransaction(UUID.randomUUID(), "f-transfer", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
-        insertTransaction(UUID.randomUUID(), "f-deposit", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", now.plusSeconds(1), now.plusSeconds(1));
+        insertTransaction(UUID.randomUUID(), "f-transfer", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
+        insertTransaction(UUID.randomUUID(), "f-deposit", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", now.plusSeconds(1), now.plusSeconds(1));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("transactionType", "TRANSFER")
@@ -657,8 +655,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("18. Filter by transactionType = DEPOSIT works")
     void test18_filterByTransactionTypeDeposit() throws Exception {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransaction(UUID.randomUUID(), "f-transfer-2", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
-        insertTransaction(UUID.randomUUID(), "f-deposit-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", now.plusSeconds(1), now.plusSeconds(1));
+        insertTransaction(UUID.randomUUID(), "f-transfer-2", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
+        insertTransaction(UUID.randomUUID(), "f-deposit-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", now.plusSeconds(1), now.plusSeconds(1));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("transactionType", "DEPOSIT")
@@ -684,8 +682,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("20. Filter by status = COMPLETED works")
     void test20_filterByStatusCompleted() throws Exception {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransaction(UUID.randomUUID(), "st-comp", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Completed", now, now);
-        insertTransaction(UUID.randomUUID(), "st-fail", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Failed", now.plusSeconds(1), null);
+        insertTransaction(UUID.randomUUID(), "st-comp", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Completed", now, now);
+        insertTransaction(UUID.randomUUID(), "st-fail", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Failed", now.plusSeconds(1), null);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("status", "COMPLETED")
@@ -700,8 +698,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("20b. Filter by status = FAILED works")
     void test20b_filterByStatusFailed() throws Exception {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransaction(UUID.randomUUID(), "st-comp-b", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Completed", now, now);
-        insertTransaction(UUID.randomUUID(), "st-fail-b", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Failed", now.plusSeconds(1), null);
+        insertTransaction(UUID.randomUUID(), "st-comp-b", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Completed", now, now);
+        insertTransaction(UUID.randomUUID(), "st-fail-b", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Failed", now.plusSeconds(1), null);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("status", "FAILED")
@@ -730,9 +728,9 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransaction(UUID.randomUUID(), "date-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
-        insertTransaction(UUID.randomUUID(), "date-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
-        insertTransaction(UUID.randomUUID(), "date-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
+        insertTransaction(UUID.randomUUID(), "date-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
+        insertTransaction(UUID.randomUUID(), "date-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
+        insertTransaction(UUID.randomUUID(), "date-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
 
         // Filter from=t2 -> should include t2 and t3 (inclusive)
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
@@ -751,9 +749,9 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransaction(UUID.randomUUID(), "to-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
-        insertTransaction(UUID.randomUUID(), "to-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
-        insertTransaction(UUID.randomUUID(), "to-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
+        insertTransaction(UUID.randomUUID(), "to-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
+        insertTransaction(UUID.randomUUID(), "to-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
+        insertTransaction(UUID.randomUUID(), "to-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
 
         // Filter to=t3 -> should include t1 and t2 (exclusive of t3)
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
@@ -772,9 +770,9 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransaction(UUID.randomUUID(), "comb-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
-        insertTransaction(UUID.randomUUID(), "comb-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
-        insertTransaction(UUID.randomUUID(), "comb-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
+        insertTransaction(UUID.randomUUID(), "comb-1", aliceAccount, bobAccount, new BigDecimal("1.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t1, t1);
+        insertTransaction(UUID.randomUUID(), "comb-2", aliceAccount, bobAccount, new BigDecimal("2.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t2, t2);
+        insertTransaction(UUID.randomUUID(), "comb-3", aliceAccount, bobAccount, new BigDecimal("3.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", t3, t3);
 
         // Filter from=t2 & to=t3 -> only t2
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
@@ -845,13 +843,13 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
 
         // Match target: TRANSFER, COMPLETED, t2
-        insertTransaction(UUID.randomUUID(), "multi-1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Target", t2, t2);
+        insertTransaction(UUID.randomUUID(), "multi-1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Target", t2, t2);
         // Different type
-        insertTransaction(UUID.randomUUID(), "multi-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Diff type", t2, t2);
+        insertTransaction(UUID.randomUUID(), "multi-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Diff type", t2, t2);
         // Different status
-        insertTransaction(UUID.randomUUID(), "multi-3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Diff status", t2, null);
+        insertTransaction(UUID.randomUUID(), "multi-3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Diff status", t2, null);
         // Different time
-        insertTransaction(UUID.randomUUID(), "multi-4", aliceAccount, bobAccount, new BigDecimal("40.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Diff time", t1, t1);
+        insertTransaction(UUID.randomUUID(), "multi-4", aliceAccount, bobAccount, new BigDecimal("40.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Diff time", t1, t1);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("transactionType", "TRANSFER")
@@ -871,8 +869,8 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         Instant baseTime = Instant.parse("2026-09-24T10:00:00Z");
         // 5 transfers, 5 deposits
         for (int i = 0; i < 5; i++) {
-            insertTransaction(UUID.randomUUID(), "pwf-t-" + i, aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer " + i, baseTime.plusSeconds(i * 10), baseTime.plusSeconds(i * 10));
-            insertTransaction(UUID.randomUUID(), "pwf-d-" + i, clearingAccount, aliceAccount, new BigDecimal("20.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit " + i, baseTime.plusSeconds(i * 10 + 5), baseTime.plusSeconds(i * 10 + 5));
+            insertTransaction(UUID.randomUUID(), "pwf-t-" + i, aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer " + i, baseTime.plusSeconds(i * 10), baseTime.plusSeconds(i * 10));
+            insertTransaction(UUID.randomUUID(), "pwf-d-" + i, clearingAccount, aliceAccount, new BigDecimal("20.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit " + i, baseTime.plusSeconds(i * 10 + 5), baseTime.plusSeconds(i * 10 + 5));
         }
 
         // Query only TRANSFER, size=2, page=1
@@ -895,7 +893,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("28. Account with no matching transactions for filter returns empty page")
     void test28_accountWithNoMatchingTransactionsForFilterReturnsEmptyPage() throws Exception {
         Instant now = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransaction(UUID.randomUUID(), "nomatch-1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
+        insertTransaction(UUID.randomUUID(), "nomatch-1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer", now, now);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", aliceAccount.getId())
                         .param("status", "FAILED")
@@ -969,7 +967,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
         DepositRequestDto depositReq = new DepositRequestDto(
                 aliceAccount.getId(),
                 new BigDecimal("1000.00"),
-                "USD",
+                "INR",
                 "Payroll deposit"
         );
         SecurityContextHolder.getContext().setAuthentication(
@@ -984,7 +982,7 @@ class TransactionHistoryIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("200.00"),
-                "USD"
+                "INR"
         );
         transferService.executeTransfer("idem-e2e-tx", transferReq);
 

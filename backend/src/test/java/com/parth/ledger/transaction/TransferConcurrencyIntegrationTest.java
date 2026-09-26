@@ -69,8 +69,8 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Opposite-direction transfers: concurrent A->B and B->A acquire locks deterministically without deadlock")
     void verifyOppositeDirectionTransfersWithoutDeadlock() throws InterruptedException {
-        Account accountA = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        Account accountB = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("1000.0000")));
+        Account accountA = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        Account accountB = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("1000.0000")));
 
         int transfersPerDirection = 20;
         int totalTransfers = transfersPerDirection * 2;
@@ -96,7 +96,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                             accountA.getId(),
                             accountB.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (Throwable t) {
@@ -121,7 +121,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                             accountB.getId(),
                             accountA.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (Throwable t) {
@@ -175,8 +175,8 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Balance exhaustion contention: concurrent debit attempts prevent overdraft and maintain correctness")
     void verifyConcurrentTransfersWithBalanceExhaustionNoLostUpdates() throws InterruptedException {
         // Initial: A has exactly 100.0000, B has 0.0000
-        Account accountA = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("100.0000")));
-        Account accountB = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("0.0000")));
+        Account accountA = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("100.0000")));
+        Account accountB = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("0.0000")));
 
         int totalThreads = 20;
         BigDecimal transferAmount = new BigDecimal("20.0000"); // 5 transfers can succeed: 5 * 20 = 100
@@ -201,7 +201,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                             accountA.getId(),
                             accountB.getId(),
                             transferAmount,
-                            "USD"
+                            "INR"
                     ));
                     successCount.incrementAndGet();
                 } catch (InsufficientBalanceException e) {
@@ -255,8 +255,8 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Concurrent identical idempotent requests: execute single transfer and return identical transaction")
     void verifyConcurrentIdenticalRetries() throws InterruptedException {
-        Account accountA = accountRepository.save(new Account(aliceUser, "USD", new BigDecimal("500.0000")));
-        Account accountB = accountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
+        Account accountA = accountRepository.save(new Account(aliceUser, "INR", new BigDecimal("500.0000")));
+        Account accountB = accountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
 
         int concurrentRetries = 10;
         String sharedKey = "tx-concurrent-idem-001";
@@ -266,7 +266,7 @@ class TransferConcurrencyIntegrationTest extends BaseIntegrationTest {
                 accountA.getId(),
                 accountB.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         ExecutorService executor = Executors.newFixedThreadPool(concurrentRetries);

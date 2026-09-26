@@ -173,7 +173,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("5. Account number is generated server-side according to model")
     void accountNumberIsGenerated() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("EUR");
+        CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
@@ -211,21 +211,18 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("7. Currency is persisted correctly")
+    @DisplayName("7. Non-INR currencies (e.g. USD, EUR, GBP) are rejected with HTTP 400")
     void currencyIsPersistedCorrectly() throws Exception {
-        CreateAccountRequestDto request = new CreateAccountRequestDto("GBP");
+        for (String curr : new String[]{"USD", "EUR", "GBP"}) {
+            CreateAccountRequestDto request = new CreateAccountRequestDto(curr);
 
-        String responseBody = mockMvc.perform(post("/api/v1/accounts")
-                        .with(user("alice.v5@ledger.com"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.currency", is("GBP")))
-                .andReturn().getResponse().getContentAsString();
-
-        UUID accountId = UUID.fromString(objectMapper.readTree(responseBody).get("accountId").asText());
-        Account account = accountRepository.findById(accountId).orElseThrow();
-        assertThat(account.getCurrency()).isEqualTo("GBP");
+            mockMvc.perform(post("/api/v1/accounts")
+                            .with(user("alice.v5@ledger.com"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("Only INR currency is supported: " + curr)));
+        }
     }
 
     @Test
@@ -350,21 +347,21 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("14. Authenticated user sees all their own accounts")
     void authenticatedUserSeesTheirOwnAccounts() throws Exception {
         accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
-        accountRepository.save(new Account(aliceUser, "EUR", BigDecimal.ZERO));
+        accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
 
         mockMvc.perform(get("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].currency", is("INR")))
-                .andExpect(jsonPath("$[1].currency", is("EUR")));
+                .andExpect(jsonPath("$[1].currency", is("INR")));
     }
 
     @Test
     @DisplayName("15. Authenticated user cannot see another user's accounts")
     void authenticatedUserCannotSeeAnotherUsersAccounts() throws Exception {
         Account aliceAcc = accountRepository.save(new Account(aliceUser, "INR", BigDecimal.ZERO));
-        Account bobAcc = accountRepository.save(new Account(bobUser, "EUR", BigDecimal.ZERO));
+        Account bobAcc = accountRepository.save(new Account(bobUser, "INR", BigDecimal.ZERO));
 
         // Alice's perspective
         mockMvc.perform(get("/api/v1/accounts")

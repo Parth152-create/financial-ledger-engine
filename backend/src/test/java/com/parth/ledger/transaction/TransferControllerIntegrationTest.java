@@ -66,9 +66,9 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         User bob = userRepository.save(new User("bob.api@ledger.com", "Bob"));
         User charlie = userRepository.save(new User("charlie.api@ledger.com", "Charlie"));
 
-        aliceUsdAccount = accountRepository.save(new Account(alice, "USD", new BigDecimal("1000.0000")));
-        bobUsdAccount = accountRepository.save(new Account(bob, "USD", new BigDecimal("500.0000")));
-        charlieEurAccount = accountRepository.save(new Account(charlie, "EUR", new BigDecimal("300.0000")));
+        aliceUsdAccount = accountRepository.save(new Account(alice, "INR", new BigDecimal("1000.0000")));
+        bobUsdAccount = accountRepository.save(new Account(bob, "INR", new BigDecimal("500.0000")));
+        charlieEurAccount = accountRepository.save(new Account(charlie, "INR", new BigDecimal("300.0000")));
     }
 
     @Test
@@ -78,7 +78,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -91,7 +91,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.sourceAccountId", is(aliceUsdAccount.getId().toString())))
                 .andExpect(jsonPath("$.destinationAccountId", is(bobUsdAccount.getId().toString())))
                 .andExpect(jsonPath("$.amount", is(100.0)))
-                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.currency", is("INR")))
                 .andExpect(jsonPath("$.createdAt", notNullValue()))
                 .andExpect(jsonPath("$.completedAt", notNullValue()));
     }
@@ -103,7 +103,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -121,7 +121,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("5000.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -140,7 +140,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 aliceUsdAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -153,7 +153,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/transfers: currency mismatch returns 400 Bad Request")
+    @DisplayName("POST /api/v1/transfers: non-INR currency returns 400 Bad Request")
     void verifyCurrencyMismatchEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
                 aliceUsdAccount.getId(),
@@ -168,7 +168,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.message", containsString("Currency mismatch")));
+                .andExpect(jsonPath("$.message", containsString("Only INR currency is supported: USD")));
     }
 
     @Test
@@ -178,7 +178,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         // First transfer succeeds
@@ -193,7 +193,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("75.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -212,7 +212,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 aliceUsdAccount.getId(),
                 bobUsdAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         String firstResponse = mockMvc.perform(post("/api/v1/transfers")
@@ -244,7 +244,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 nonExistentId,
                 bobUsdAccount.getId(),
                 new BigDecimal("50.0000"),
-                "USD"
+                "INR"
         );
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -264,7 +264,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                     "sourceAccountId": "%s",
                     "destinationAccountId": "%s",
                     "amount": -50.00,
-                    "currency": "USD"
+                    "currency": "INR"
                 }
                 """.formatted(aliceUsdAccount.getId(), bobUsdAccount.getId());
 

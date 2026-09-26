@@ -84,8 +84,8 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
         aliceUser = userRepository.save(new User("alice.redis@ledger.com", "Alice"));
         bobUser = userRepository.save(new User("bob.redis@ledger.com", "Bob"));
 
-        aliceAccount = spyAccountRepository.save(new Account(aliceUser, "USD", new BigDecimal("1000.0000")));
-        bobAccount = spyAccountRepository.save(new Account(bobUser, "USD", new BigDecimal("500.0000")));
+        aliceAccount = spyAccountRepository.save(new Account(aliceUser, "INR", new BigDecimal("1000.0000")));
+        bobAccount = spyAccountRepository.save(new Account(bobUser, "INR", new BigDecimal("500.0000")));
 
         reset(spyAccountRepository);
         reset(spyIdempotencyCacheService);
@@ -110,7 +110,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         TransferResponseDto response = transferService.executeTransfer(idempotencyKey, request);
@@ -127,7 +127,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
         assertThat(cachedDto.sourceAccountId()).isEqualTo(aliceAccount.getId());
         assertThat(cachedDto.destinationAccountId()).isEqualTo(bobAccount.getId());
         assertThat(cachedDto.amount()).isEqualByComparingTo(transferAmount);
-        assertThat(cachedDto.currency()).isEqualTo("USD");
+        assertThat(cachedDto.currency()).isEqualTo("INR");
     }
 
     @Test
@@ -140,7 +140,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // First transfer: executes DB transaction and populates Redis
@@ -181,7 +181,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("100.0000"),
-                "USD"
+                "INR"
         );
 
         // First transfer populates Redis
@@ -194,7 +194,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 new BigDecimal("200.0000"),
-                "USD"
+                "INR"
         );
 
         assertThatThrownBy(() -> transferService.executeTransfer(idempotencyKey, requestConflict))
@@ -221,7 +221,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         TransferResponseDto initialResponse = transferService.executeTransfer(idempotencyKey, request);
@@ -264,7 +264,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Simulate Redis outage on GET
@@ -296,7 +296,7 @@ class TransferRedisIdempotencyIntegrationTest extends BaseIntegrationTest {
                 aliceAccount.getId(),
                 bobAccount.getId(),
                 transferAmount,
-                "USD"
+                "INR"
         );
 
         // Simulate Redis failure during SET

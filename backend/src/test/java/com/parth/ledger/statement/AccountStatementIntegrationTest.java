@@ -12,6 +12,7 @@ import com.parth.ledger.reconciliation.ReconciliationStatus;
 import com.parth.ledger.reconciliation.dto.ReconciliationResultDto;
 import com.parth.ledger.reconciliation.service.ReconciliationService;
 import com.parth.ledger.statement.dto.AccountStatementResponseDto;
+import com.parth.ledger.system.SystemFundingService;
 import com.parth.ledger.transaction.TransactionRepository;
 import com.parth.ledger.transaction.TransactionStatus;
 import com.parth.ledger.transaction.TransactionType;
@@ -77,6 +78,9 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReconciliationService reconciliationService;
 
+    @Autowired
+    private SystemFundingService systemFundingService;
+
     private User aliceUser;
     private User bobUser;
     private Account aliceAccount;
@@ -100,7 +104,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
 
         aliceAccount = accountRepository.save(new Account(
                 aliceUser,
-                "USD",
+                "INR",
                 BigDecimal.ZERO.setScale(4),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -109,7 +113,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
 
         bobAccount = accountRepository.save(new Account(
                 bobUser,
-                "USD",
+                "INR",
                 BigDecimal.ZERO.setScale(4),
                 AccountType.USER_CHECKING,
                 AccountStatus.ACTIVE,
@@ -131,13 +135,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     }
 
     private Account ensureSystemClearingAccount(BigDecimal initialBalance) {
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, currency, balance, version, created_at, updated_at, account_type, status, account_number) " +
-                        "VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'USD', ?, 0, NOW(), NOW(), 'SYSTEM_CLEARING', 'ACTIVE', 'ACCT-SYSTEM-CLEARING-01') " +
-                        "ON CONFLICT (id) DO UPDATE SET balance = EXCLUDED.balance, status = 'ACTIVE'",
-                initialBalance
-        );
-        return accountRepository.findById(DepositService.SYSTEM_CLEARING_ACCOUNT_ID).orElseThrow();
+        return systemFundingService.bootstrapSystemFunding(initialBalance);
     }
 
     private void insertTransactionAndLedgerEntries(
@@ -187,7 +185,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
         insertTransactionAndLedgerEntries(
                 UUID.randomUUID(), null, null, "s-tx-1",
-                clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD",
+                clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR",
                 TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Funding", t, t
         );
 
@@ -196,7 +194,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())))
                 .andExpect(jsonPath("$.accountNumber", is(aliceAccount.getAccountNumber())))
-                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.currency", is("INR")))
                 .andExpect(jsonPath("$.openingBalance", is(0.0)))
                 .andExpect(jsonPath("$.closingBalance", is(500.0)))
                 .andExpect(jsonPath("$.totalCredits", is(500.0)))
@@ -231,9 +229,9 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         UUID tx2 = UUID.randomUUID();
         UUID tx3 = UUID.randomUUID();
 
-        insertTransactionAndLedgerEntries(tx1, null, null, "tx-order-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "First", t1, t1);
-        insertTransactionAndLedgerEntries(tx2, null, null, "tx-order-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Second", t2, t2);
-        insertTransactionAndLedgerEntries(tx3, null, null, "tx-order-3", clearingAccount, aliceAccount, new BigDecimal("300.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Third", t3, t3);
+        insertTransactionAndLedgerEntries(tx1, null, null, "tx-order-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "First", t1, t1);
+        insertTransactionAndLedgerEntries(tx2, null, null, "tx-order-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Second", t2, t2);
+        insertTransactionAndLedgerEntries(tx3, null, null, "tx-order-3", clearingAccount, aliceAccount, new BigDecimal("300.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Third", t3, t3);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -253,8 +251,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         UUID le1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID le2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-        insertTransactionAndLedgerEntries(tx1, null, le1, "same-1", clearingAccount, aliceAccount, new BigDecimal("10.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "First tie", sameTime, sameTime);
-        insertTransactionAndLedgerEntries(tx2, null, le2, "same-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Second tie", sameTime, sameTime);
+        insertTransactionAndLedgerEntries(tx1, null, le1, "same-1", clearingAccount, aliceAccount, new BigDecimal("10.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "First tie", sameTime, sameTime);
+        insertTransactionAndLedgerEntries(tx2, null, le2, "same-2", clearingAccount, aliceAccount, new BigDecimal("20.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Second tie", sameTime, sameTime);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -272,27 +270,23 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())))
                 .andExpect(jsonPath("$.accountNumber", is(aliceAccount.getAccountNumber())))
-                .andExpect(jsonPath("$.currency", is("USD")));
+                .andExpect(jsonPath("$.currency", is("INR")));
     }
 
     @Test
     @DisplayName("6. Currency is correct")
     void test06_currencyIsCorrect() throws Exception {
-        Account eurAccount = accountRepository.save(new Account(
-                aliceUser, "EUR", BigDecimal.ZERO.setScale(4), AccountType.USER_CHECKING, AccountStatus.ACTIVE, "ACCT-ALICE-EUR"
-        ));
-
-        mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", eurAccount.getId())
+        mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currency", is("EUR")));
+                .andExpect(jsonPath("$.currency", is("INR")));
     }
 
     @Test
     @DisplayName("7. Deposit increases running balance")
     void test07_depositIncreasesRunningBalance() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "dep-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "dep-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -307,8 +301,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t1 = Instant.parse("2026-09-24T09:00:00Z");
         Instant t2 = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "init-dep", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "out-tx", aliceAccount, bobAccount, new BigDecimal("200.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer Out", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "init-dep", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "out-tx", aliceAccount, bobAccount, new BigDecimal("200.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer Out", t2, t2);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -323,7 +317,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("9. Incoming transfer increases running balance")
     void test09_incomingTransferIncreasesRunningBalance() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "in-tx", bobAccount, aliceAccount, new BigDecimal("350.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "Incoming", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "in-tx", bobAccount, aliceAccount, new BigDecimal("350.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "Incoming", t, t);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -340,10 +334,10 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
         Instant t4 = Instant.parse("2026-09-24T11:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit 2", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-3", aliceAccount, bobAccount, new BigDecimal("200.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer Out", t3, t3);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-4", bobAccount, aliceAccount, new BigDecimal("300.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "Transfer In", t4, t4);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Deposit 2", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-3", aliceAccount, bobAccount, new BigDecimal("200.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Transfer Out", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "seq-4", bobAccount, aliceAccount, new BigDecimal("300.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "Transfer In", t4, t4);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -362,8 +356,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t1 = Instant.parse("2026-09-24T08:00:00Z");
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cb-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cb-2", aliceAccount, bobAccount, new BigDecimal("150.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cb-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cb-2", aliceAccount, bobAccount, new BigDecimal("150.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -378,7 +372,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("12. Opening balance is zero for full-history statement")
     void test12_openingBalanceZeroForFullHistory() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "full-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "full-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -394,9 +388,9 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
         Instant from = Instant.parse("2026-09-24T09:30:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-2", aliceAccount, bobAccount, new BigDecimal("300.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-3", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep 2", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-2", aliceAccount, bobAccount, new BigDecimal("300.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ob-3", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep 2", t3, t3);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", from.toString())
@@ -415,7 +409,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     void test14_openingBalanceDoesNotUseAccountsBalance() throws Exception {
         Instant t1 = Instant.parse("2026-09-24T08:00:00Z");
         Instant from = Instant.parse("2026-09-24T09:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "nob-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "nob-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
 
         jdbcTemplate.update("UPDATE accounts SET balance = 99999.0000 WHERE id = ?", aliceAccount.getId());
 
@@ -436,10 +430,10 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t4 = Instant.parse("2026-09-24T10:00:00Z");
         Instant from = Instant.parse("2026-09-24T08:30:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-3", aliceAccount, bobAccount, new BigDecimal("50.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", t3, t3);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-4", clearingAccount, aliceAccount, new BigDecimal("150.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "4", t4, t4);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-3", aliceAccount, bobAccount, new BigDecimal("50.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "r-4", clearingAccount, aliceAccount, new BigDecimal("150.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "4", t4, t4);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", from.toString())
@@ -456,7 +450,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("16. from is inclusive")
     void test16_fromIsInclusive() throws Exception {
         Instant t1 = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inc-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "At boundary", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inc-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "At boundary", t1, t1);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", t1.toString())
@@ -471,7 +465,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("17. to is exclusive")
     void test17_toIsExclusive() throws Exception {
         Instant t1 = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "exc-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "At to boundary", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "exc-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "At to boundary", t1, t1);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("to", t1.toString())
@@ -487,9 +481,9 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-3", clearingAccount, aliceAccount, new BigDecimal("300.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "3", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-2", clearingAccount, aliceAccount, new BigDecimal("200.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "ft-3", clearingAccount, aliceAccount, new BigDecimal("300.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "3", t3, t3);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", t2.toString())
@@ -521,7 +515,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("20. from == to returns empty statement with zero activity")
     void test20_fromEqualToToReturnsEmptyStatement() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "eq-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Earlier", t.minusSeconds(3600), t.minusSeconds(3600));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "eq-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Earlier", t.minusSeconds(3600), t.minusSeconds(3600));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", t.toString())
@@ -558,8 +552,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t1 = Instant.parse("2026-09-24T08:00:00Z");
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-dep", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-tx", aliceAccount, bobAccount, new BigDecimal("100.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-dep", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-tx", aliceAccount, bobAccount, new BigDecimal("100.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("transactionType", "TRANSFER")
@@ -579,8 +573,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t1 = Instant.parse("2026-09-24T08:00:00Z");
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-dep-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-tx-2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-dep-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "flt-tx-2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "Tx", t2, t2);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("transactionType", "DEPOSIT")
@@ -600,8 +594,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t1 = Instant.parse("2026-09-24T08:00:00Z");
         Instant t2 = Instant.parse("2026-09-24T09:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "st-comp-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "st-fail-1", aliceAccount, bobAccount, new BigDecimal("100.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Tx", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "st-comp-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "st-fail-1", aliceAccount, bobAccount, new BigDecimal("100.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.FAILED, aliceUser, "Tx", t2, t2);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("status", "COMPLETED")
@@ -638,7 +632,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         for (int i = 0; i < 5; i++) {
             insertTransactionAndLedgerEntries(
                     UUID.randomUUID(), null, null, "p-tx-" + i,
-                    clearingAccount, aliceAccount, new BigDecimal("10.0000"), "USD",
+                    clearingAccount, aliceAccount, new BigDecimal("10.0000"), "INR",
                     TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "P" + i,
                     base.plusSeconds(i * 60), base.plusSeconds(i * 60)
             );
@@ -671,7 +665,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         for (int i = 0; i < 5; i++) {
             insertTransactionAndLedgerEntries(
                     UUID.randomUUID(), null, null, "pm-tx-" + i,
-                    clearingAccount, aliceAccount, new BigDecimal("10.0000"), "USD",
+                    clearingAccount, aliceAccount, new BigDecimal("10.0000"), "INR",
                     TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "P" + i,
                     base.plusSeconds(i * 60), base.plusSeconds(i * 60)
             );
@@ -720,10 +714,10 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("32. Running balance remains correct across page boundaries")
     void test32_runningBalanceCorrectAcrossPageBoundaries() throws Exception {
         Instant base = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", base, base);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-2", clearingAccount, aliceAccount, new BigDecimal("50.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", base.plusSeconds(10), base.plusSeconds(10));
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", base.plusSeconds(20), base.plusSeconds(20));
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-4", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "4", base.plusSeconds(30), base.plusSeconds(30));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-1", clearingAccount, aliceAccount, new BigDecimal("100.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", base, base);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-2", clearingAccount, aliceAccount, new BigDecimal("50.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", base.plusSeconds(10), base.plusSeconds(10));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", base.plusSeconds(20), base.plusSeconds(20));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "bnd-4", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "4", base.plusSeconds(30), base.plusSeconds(30));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("page", "0")
@@ -747,8 +741,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("33. totalCredits correct")
     void test33_totalCreditsCorrect() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "tc-1", clearingAccount, aliceAccount, new BigDecimal("250.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t, t);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "tc-2", clearingAccount, aliceAccount, new BigDecimal("150.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t.plusSeconds(1), t.plusSeconds(1));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "tc-1", clearingAccount, aliceAccount, new BigDecimal("250.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "tc-2", clearingAccount, aliceAccount, new BigDecimal("150.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t.plusSeconds(1), t.plusSeconds(1));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -760,8 +754,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("34. totalDebits correct")
     void test34_totalDebitsCorrect() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "td-1", aliceAccount, bobAccount, new BigDecimal("75.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "1", t, t);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "td-2", aliceAccount, bobAccount, new BigDecimal("25.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "2", t.plusSeconds(1), t.plusSeconds(1));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "td-1", aliceAccount, bobAccount, new BigDecimal("75.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "1", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "td-2", aliceAccount, bobAccount, new BigDecimal("25.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "2", t.plusSeconds(1), t.plusSeconds(1));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .with(user(aliceUser.getEmail())))
@@ -777,9 +771,9 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t3 = Instant.parse("2026-09-24T10:00:00Z");
         Instant from = Instant.parse("2026-09-24T08:30:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-2", clearingAccount, aliceAccount, new BigDecimal("400.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-3", aliceAccount, bobAccount, new BigDecimal("150.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "1", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-2", clearingAccount, aliceAccount, new BigDecimal("400.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "2", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "inv-3", aliceAccount, bobAccount, new BigDecimal("150.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "3", t3, t3);
 
         MvcResult result = mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", from.toString())
@@ -894,8 +888,8 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(aliceUser.getEmail(), null, Collections.emptyList())
         );
-        depositService.executeDeposit("e2e-dep-1", new DepositRequestDto(aliceAccount.getId(), new BigDecimal("1000.00"), "USD", "Dep"));
-        transferService.executeTransfer("e2e-tx-1", new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("350.00"), "USD"));
+        depositService.executeDeposit("e2e-dep-1", new DepositRequestDto(aliceAccount.getId(), new BigDecimal("1000.00"), "INR", "Dep"));
+        transferService.executeTransfer("e2e-tx-1", new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("350.00"), "INR"));
 
         ReconciliationResultDto recon = reconciliationService.reconcileAccount(aliceAccount.getId());
         assertThat(recon.status()).isEqualTo(ReconciliationStatus.CONSISTENT);
@@ -914,7 +908,7 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     @DisplayName("46. Statement does not mutate or repair reconciliation discrepancies")
     void test46_statementDoesNotRepairDiscrepancies() throws Exception {
         Instant t = Instant.parse("2026-09-24T10:00:00Z");
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "disc-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "disc-1", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Dep", t, t);
 
         jdbcTemplate.update("UPDATE accounts SET balance = 8888.0000 WHERE id = ?", aliceAccount.getId());
 
@@ -937,10 +931,10 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t4 = Instant.parse("2026-09-24T11:00:00Z");
         Instant to = Instant.parse("2026-09-24T11:30:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-dep-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D1", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-tx-1", aliceAccount, bobAccount, new BigDecimal("200.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-dep-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D2", t3, t3);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-tx-2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t4, t4);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-dep-1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D1", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-tx-1", aliceAccount, bobAccount, new BigDecimal("200.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-dep-2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D2", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "h-tx-2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t4, t4);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("from", from.toString())
@@ -967,11 +961,11 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
         Instant t4 = Instant.parse("2026-09-24T11:00:00Z");
         Instant t5 = Instant.parse("2026-09-24T12:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-d1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D1", t1, t1);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t1", aliceAccount, bobAccount, new BigDecimal("200.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t2, t2);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-d2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D2", t3, t3);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t4, t4);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t3", bobAccount, aliceAccount, new BigDecimal("300.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "T3", t5, t5);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-d1", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D1", t1, t1);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t1", aliceAccount, bobAccount, new BigDecimal("200.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", t2, t2);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-d2", clearingAccount, aliceAccount, new BigDecimal("500.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "D2", t3, t3);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t2", aliceAccount, bobAccount, new BigDecimal("100.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", t4, t4);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "fh-t3", bobAccount, aliceAccount, new BigDecimal("300.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, bobUser, "T3", t5, t5);
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("transactionType", "TRANSFER")
@@ -992,10 +986,10 @@ class AccountStatementIntegrationTest extends BaseIntegrationTest {
     void test49_crossPageHiddenActivity() throws Exception {
         Instant base = Instant.parse("2026-09-24T10:00:00Z");
 
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", base, base);
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t2", aliceAccount, bobAccount, new BigDecimal("20.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", base.plusSeconds(10), base.plusSeconds(10));
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-hidden-dep", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "USD", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Hidden Deposit", base.plusSeconds(15), base.plusSeconds(15));
-        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "USD", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", base.plusSeconds(20), base.plusSeconds(20));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t1", aliceAccount, bobAccount, new BigDecimal("10.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T1", base, base);
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t2", aliceAccount, bobAccount, new BigDecimal("20.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T2", base.plusSeconds(10), base.plusSeconds(10));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-hidden-dep", clearingAccount, aliceAccount, new BigDecimal("1000.0000"), "INR", TransactionType.DEPOSIT, TransactionStatus.COMPLETED, null, "Hidden Deposit", base.plusSeconds(15), base.plusSeconds(15));
+        insertTransactionAndLedgerEntries(UUID.randomUUID(), null, null, "cp-t3", aliceAccount, bobAccount, new BigDecimal("30.0000"), "INR", TransactionType.TRANSFER, TransactionStatus.COMPLETED, aliceUser, "T3", base.plusSeconds(20), base.plusSeconds(20));
 
         mockMvc.perform(get("/api/v1/accounts/{accountId}/statement", aliceAccount.getId())
                         .param("transactionType", "TRANSFER")
