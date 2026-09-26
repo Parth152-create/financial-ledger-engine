@@ -9,7 +9,21 @@ export interface TransferRequest {
   description?: string
 }
 
-export interface TransferResponse {
+export interface DepositRequest {
+  accountId: string
+  amount: number
+  currency: string
+  description?: string
+}
+
+export interface WithdrawalRequest {
+  accountId: string
+  amount: number
+  currency: string
+  description?: string
+}
+
+export interface TransactionResponse {
   transactionId: string
   status: TransactionStatus
   sourceAccountId: string
@@ -19,6 +33,12 @@ export interface TransferResponse {
   createdAt: string
   completedAt?: string | null
   transactionType: TransactionType
+  idempotencyKey?: string | null
   initiatedByUserId?: string | null
   description?: string | null
 }
+
+export type TransferResponse = TransactionResponse
+export type DepositResponse = TransactionResponse
+export type WithdrawalResponse = TransactionResponse
+

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, ArrowLeftRight, Download, AlertCircle, RotateCw } from "lucide-react"
+import { ArrowLeft, ArrowLeftRight, ArrowDownLeft, ArrowUpRight, Download, AlertCircle, RotateCw } from "lucide-react"
 import { AccountHeader } from "@/components/accounts/account-header"
 import { AccountMeta } from "@/components/accounts/account-meta"
 import { Section } from "@/components/ui/section"
@@ -121,7 +121,19 @@ export default function AccountDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href={ROUTES.TRANSFERS}>
+          <Link href={`${ROUTES.TRANSFERS}?tab=deposit&accountId=${account.accountId}`}>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <ArrowDownLeft className="size-3.5" />
+              <span>Deposit</span>
+            </Button>
+          </Link>
+          <Link href={`${ROUTES.TRANSFERS}?tab=withdrawal&accountId=${account.accountId}`}>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <ArrowUpRight className="size-3.5" />
+              <span>Withdraw</span>
+            </Button>
+          </Link>
+          <Link href={`${ROUTES.TRANSFERS}?tab=transfer&accountId=${account.accountId}`}>
             <Button size="sm" className="gap-1.5">
               <ArrowLeftRight className="size-3.5" />
               <span>Transfer Funds</span>

@@ -6,6 +6,8 @@ export const ROUTES = {
   ACCOUNTS: "/app/accounts",
   ACCOUNT_DETAILS: (accountId: string) => `/app/accounts/${accountId}`,
   TRANSFERS: "/app/transfers",
+  DEPOSITS: "/app/transfers?tab=deposit",
+  WITHDRAWALS: "/app/transfers?tab=withdrawal",
   LEDGER: "/app/ledger",
   ANALYTICS: "/app/analytics",
   RECONCILIATION: "/app/reconciliation",
