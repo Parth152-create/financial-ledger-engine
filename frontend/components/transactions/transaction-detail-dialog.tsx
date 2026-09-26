@@ -76,7 +76,6 @@ export function TransactionDetailDialog({
   const destinationAccountId = "destinationAccountId" in transaction ? transaction.destinationAccountId : undefined
   const hasAccounts = Boolean(sourceAccountId && destinationAccountId)
   const balanceAfter = "balanceAfter" in transaction ? transaction.balanceAfter : undefined
-  const initiatedByUserId = "initiatedByUserId" in transaction ? transaction.initiatedByUserId : undefined
 
   return (
     <div
@@ -214,15 +213,6 @@ export function TransactionDetailDialog({
               <span className="text-muted-foreground">Completed At</span>
               <span className="font-mono text-xs text-foreground">
                 {formatDate(transaction.completedAt)}
-              </span>
-            </div>
-          )}
-
-          {initiatedByUserId && (
-            <div className="py-2 flex items-center justify-between">
-              <span className="text-muted-foreground">Initiated By User</span>
-              <span className="font-mono text-xs text-muted-foreground truncate max-w-[160px]">
-                {initiatedByUserId}
               </span>
             </div>
           )}

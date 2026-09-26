@@ -28,7 +28,7 @@ import { useAccountTransactions } from "@/hooks/api/use-transactions"
 import { useAccountStatement } from "@/hooks/api/use-statements"
 import { cn } from "@/lib/utils"
 
-type TimeRange = "24h" | "7d" | "30d" | "all"
+type TimeRange = "24h" | "7d" | "30d" | "retrieved"
 
 export default function AnalyticsPage() {
   const {
@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
 
   // Derive "from" timestamp based on timeRange
   const fromTimestamp = React.useMemo(() => {
-    if (timeRange === "all") return undefined
+    if (timeRange === "retrieved") return undefined
     const now = new Date()
     if (timeRange === "24h") {
       now.setHours(now.getHours() - 24)
@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
             Analytics
           </h1>
           <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
-            Operational transaction throughput, monetary volume, balance trends, and settlement success.
+            Operational transaction throughput, monetary volume, balance trends, and settlement success calculated from the currently retrieved transaction window.
           </p>
         </div>
 
@@ -203,7 +203,7 @@ export default function AnalyticsPage() {
           )}
 
           <div className="flex items-center gap-1 border border-border/70 rounded-sm p-0.5 bg-muted/20">
-            {(["24h", "7d", "30d", "all"] as TimeRange[]).map((range) => (
+            {(["24h", "7d", "30d", "retrieved"] as TimeRange[]).map((range) => (
               <button
                 key={range}
                 type="button"
@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
                   ? "7 Days"
                   : range === "30d"
                   ? "30 Days"
-                  : "All Time"}
+                  : "Retrieved"}
               </button>
             ))}
           </div>
@@ -376,7 +376,7 @@ export default function AnalyticsPage() {
               </h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 <strong className="text-foreground">Backend Availability:</strong> The engine does not expose a dedicated pre-aggregated analytics service.
-                Metrics shown are <span className="text-foreground font-medium">frontend-derived deterministically</span> from authorized account transactions and double-entry statements.
+                Metrics shown are <span className="text-foreground font-medium">frontend-derived deterministically</span> from the currently retrieved transaction window and double-entry statements.
               </p>
               <div className="text-[11px] text-muted-foreground/80 font-mono space-y-0.5 pt-1 border-t border-border/50">
                 <div>• Scoped strictly to account: {currentAccount?.accountNumber}</div>

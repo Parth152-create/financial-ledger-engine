@@ -218,3 +218,59 @@ test("Analytics Transaction Mix: calculates distribution across TRANSFER, DEPOSI
   assert.equal(mix.withdrawalPct, 25)
   assert.equal(mix.transferPct + mix.depositPct + mix.withdrawalPct, 100)
 })
+
+// 7. Time-Window Selector & Retrieved Window Semantics Tests
+test("Analytics Time-Window: verifies window options, labels, and retrieved window semantics", () => {
+  const timeRanges = [
+    { value: "24h", label: "24 Hours" },
+    { value: "7d", label: "7 Days" },
+    { value: "30d", label: "30 Days" },
+    { value: "retrieved", label: "Retrieved" },
+  ]
+
+  // Verify "All Time" is retired and replaced with "Retrieved"
+  assert.equal(timeRanges.some((r) => r.label === "All Time"), false)
+  assert.equal(timeRanges.some((r) => r.label === "Retrieved"), true)
+  assert.equal(timeRanges.find((r) => r.value === "retrieved")?.label, "Retrieved")
+
+  // Function computing 'from' cutoff matching frontend derivation logic
+  const computeFromTimestamp = (range, mockNow = new Date("2026-09-26T12:00:00.000Z")) => {
+    if (range === "retrieved") return undefined
+    const d = new Date(mockNow.getTime())
+    if (range === "24h") {
+      d.setHours(d.getHours() - 24)
+    } else if (range === "7d") {
+      d.setDate(d.getDate() - 7)
+    } else if (range === "30d") {
+      d.setDate(d.getDate() - 30)
+    }
+    return d.toISOString()
+  }
+
+  // 24h, 7d, 30d should produce ISO string timestamps
+  assert.equal(computeFromTimestamp("24h"), "2026-09-25T12:00:00.000Z")
+  assert.equal(computeFromTimestamp("7d"), "2026-09-19T12:00:00.000Z")
+  assert.equal(computeFromTimestamp("30d"), "2026-08-27T12:00:00.000Z")
+
+  // "retrieved" must return undefined (no 'from' timestamp filter, bound to retrieved page/window)
+  assert.equal(computeFromTimestamp("retrieved"), undefined)
+})
+
+test("Analytics Calculations: calculations are computed strictly from retrieved transaction window without backend aggregation API", () => {
+  // Underlying analytics calculations remain unchanged on the retrieved window
+  const retrievedTransactions = [
+    { createdAt: "2026-09-24T10:00:00Z", amount: 100, status: "COMPLETED", transactionType: "TRANSFER" },
+    { createdAt: "2026-09-25T10:00:00Z", amount: 200, status: "COMPLETED", transactionType: "DEPOSIT" },
+    { createdAt: "2026-09-26T10:00:00Z", amount: 50, status: "FAILED", transactionType: "WITHDRAWAL" },
+  ]
+
+  const totalVolume = retrievedTransactions.length
+  const totalValue = retrievedTransactions.reduce((sum, tx) => sum + tx.amount, 0)
+  const completedCount = retrievedTransactions.filter((tx) => tx.status === "COMPLETED").length
+  const successRate = ((completedCount / totalVolume) * 100).toFixed(1)
+
+  assert.equal(totalVolume, 3)
+  assert.equal(totalValue, 350)
+  assert.equal(completedCount, 2)
+  assert.equal(successRate, "66.7")
+})

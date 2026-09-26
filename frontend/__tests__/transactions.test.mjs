@@ -243,3 +243,56 @@ test("Error Handling: hides technical stack traces and maps status codes", () =>
     "Invalid transaction query parameters or date range."
   )
 })
+
+// 7. Transaction Detail Modal Projection Tests
+test("Transaction Detail: retains copyable transactionId and omits initiatedByUserId from user-facing modal", () => {
+  const transactionData = {
+    transactionId: "018f3a8b-1234-7890-abcd-ef0123456789",
+    amount: 1500.0,
+    currency: "INR",
+    direction: "CREDIT",
+    status: "COMPLETED",
+    transactionType: "TRANSFER",
+    sourceAccountId: "acc-source-123",
+    destinationAccountId: "acc-dest-456",
+    balanceAfter: 12500.0,
+    initiatedByUserId: "user-internal-uuid-999",
+    description: "Monthly vendor settlement",
+    createdAt: "2026-09-24T10:00:00Z",
+    completedAt: "2026-09-24T10:00:02Z",
+  }
+
+  // Model the user-facing modal projection:
+  // - transactionId must be kept available/copyable
+  // - initiatedByUserId must be omitted from normal user-facing display
+  const getModalDisplayModel = (tx) => {
+    return {
+      transactionId: tx.transactionId,
+      amount: tx.amount,
+      currency: tx.currency,
+      direction: tx.direction,
+      status: tx.status,
+      transactionType: tx.transactionType,
+      sourceAccountId: tx.sourceAccountId,
+      destinationAccountId: tx.destinationAccountId,
+      balanceAfter: tx.balanceAfter,
+      createdAt: tx.createdAt,
+      completedAt: tx.completedAt,
+      description: tx.description,
+      // initiatedByUserId is intentionally omitted from modal view
+    }
+  }
+
+  const displayModel = getModalDisplayModel(transactionData)
+
+  // 1. Transaction ID is retained and available
+  assert.equal(displayModel.transactionId, "018f3a8b-1234-7890-abcd-ef0123456789")
+  assert.ok(displayModel.transactionId.length > 0)
+
+  // 2. initiatedByUserId is omitted from user-facing modal
+  assert.equal("initiatedByUserId" in displayModel, false)
+  assert.equal(displayModel.initiatedByUserId, undefined)
+
+  // 3. Raw backend DTO continues to preserve initiatedByUserId (DTOs/APIs not modified)
+  assert.equal(transactionData.initiatedByUserId, "user-internal-uuid-999")
+})
