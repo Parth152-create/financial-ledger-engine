@@ -72,6 +72,9 @@ export default function AccountDetailPage() {
   }
 
   if (isError || !account) {
+    const isNotFound = error?.status === 404
+    const isForbidden = error?.status === 403
+
     return (
       <div className="space-y-6 select-none font-sans">
         <div className="flex items-center gap-2 pb-3 border-b border-border/70">
@@ -87,14 +90,21 @@ export default function AccountDetailPage() {
           </span>
         </div>
 
-        <div className="p-12 text-center space-y-3 bg-card border border-destructive/20 rounded-sm">
+        <div className="p-12 text-center space-y-3 bg-card border border-border/70 rounded-sm">
           <AlertCircle className="size-8 text-destructive mx-auto" />
-          <p className="text-[15px] font-semibold text-foreground">
-            Account Not Found or Access Unauthorized
-          </p>
+          <h2 className="text-[16px] font-semibold text-foreground">
+            {isNotFound
+              ? "Account not found"
+              : isForbidden
+              ? "Access Denied"
+              : "Failed to load account"}
+          </h2>
           <p className="text-[13.5px] text-muted-foreground max-w-md mx-auto">
-            {error?.message ||
-              "The requested checking account does not exist or you do not have permission to view it."}
+            {isNotFound
+              ? "This account may no longer exist or you may not have access to it."
+              : isForbidden
+              ? "You don't have access to this account."
+              : error?.message || "An unexpected error occurred while fetching account details."}
           </p>
           <div className="flex items-center justify-center gap-2 pt-2">
             <Link href={ROUTES.ACCOUNTS}>
@@ -102,15 +112,17 @@ export default function AccountDetailPage() {
                 Back to Accounts
               </Button>
             </Link>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => refetch()}
-              className="gap-1.5"
-            >
-              <RotateCw className="size-3.5" />
-              <span>Retry</span>
-            </Button>
+            {!isNotFound && !isForbidden && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => refetch()}
+                className="gap-1.5"
+              >
+                <RotateCw className="size-3.5" />
+                <span>Retry</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -178,11 +190,13 @@ export default function AccountDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <AccountMeta
-            accountId={account.accountId}
+            accountNumber={account.accountNumber}
+            accountType={account.accountType === "USER_CHECKING" ? "Checking" : account.accountType}
             currency={account.currency}
-            accountType={account.accountType}
             status={account.status}
             createdAt={formatDate(account.createdAt)}
+            updatedAt={account.updatedAt ? formatDate(account.updatedAt) : undefined}
+            accountId={account.accountId}
             reconciliationStatus="CONSISTENT"
           />
         </div>

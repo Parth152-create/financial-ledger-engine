@@ -170,7 +170,9 @@ export function AccountTransactionHistory({
       </div>
 
       <div className="border border-border/70 rounded-sm overflow-hidden bg-card">
-        <div className="grid grid-cols-12 gap-3 px-3.5 py-2 bg-muted/40 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/70">
+        <div className="overflow-x-auto">
+          <div className="min-w-[620px]">
+            <div className="grid grid-cols-12 gap-3 px-3.5 py-2 bg-muted/40 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/70">
           <span className="col-span-2">Date & Time</span>
           <span className="col-span-2">Type</span>
           <span className="col-span-3">Account Flow</span>
@@ -269,6 +271,8 @@ export function AccountTransactionHistory({
             ))}
           </div>
         )}
+          </div>
+        </div>
 
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/20 border-t border-border/70 text-xs text-muted-foreground">

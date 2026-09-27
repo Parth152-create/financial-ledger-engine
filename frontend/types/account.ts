@@ -1,4 +1,4 @@
-export type AccountType = "USER_CHECKING" | "SYSTEM_CLEARING"
+export type AccountType = "USER_CHECKING" | "SYSTEM_CLEARING" | "SYSTEM_TREASURY"
 
 export type AccountStatus = "ACTIVE" | "FROZEN" | "CLOSED"
 

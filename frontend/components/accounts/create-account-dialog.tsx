@@ -22,13 +22,23 @@ export function CreateAccountDialog({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const createAccountMutation = useCreateAccount()
 
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     if (!createAccountMutation.isPending) {
       setCurrency("INR")
       setErrorMsg(null)
       onOpenChange(false)
     }
-  }
+  }, [createAccountMutation.isPending, onOpenChange])
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        handleClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [open, handleClose])
 
   if (!open) return null
 
@@ -44,6 +54,11 @@ export function CreateAccountDialog({
 
     if (!/^[A-Z]{3}$/.test(trimmedCurrency)) {
       setErrorMsg("Currency must be exactly 3 uppercase letters (e.g., INR)")
+      return
+    }
+
+    if (trimmedCurrency !== "INR") {
+      setErrorMsg("Only INR currency is supported on this platform")
       return
     }
 

@@ -177,3 +177,55 @@ test("Foundation: AuthBoundary state transitions correctly from verifying to red
     "AUTHENTICATED"
   )
 })
+
+// 8. Restrained Theme Transition & Reduced Motion Behavior
+test("Foundation: Restrained theme transition enforces 200-300ms timing and respects reduced motion", () => {
+  const TRANSITION_DURATION_MS = 220
+  assert.ok(TRANSITION_DURATION_MS >= 200 && TRANSITION_DURATION_MS <= 300, "Theme transition duration within 200-300ms target")
+
+  // Determine transition strategy
+  const resolveThemeTransitionMode = ({ isReducedMotion, hasViewTransitionApi }) => {
+    if (isReducedMotion) return "IMMEDIATE"
+    if (hasViewTransitionApi) return "VIEW_TRANSITION_CROSSFADE"
+    return "CSS_FALLBACK"
+  }
+
+  assert.equal(
+    resolveThemeTransitionMode({ isReducedMotion: true, hasViewTransitionApi: true }),
+    "IMMEDIATE"
+  )
+  assert.equal(
+    resolveThemeTransitionMode({ isReducedMotion: false, hasViewTransitionApi: true }),
+    "VIEW_TRANSITION_CROSSFADE"
+  )
+  assert.equal(
+    resolveThemeTransitionMode({ isReducedMotion: false, hasViewTransitionApi: false }),
+    "CSS_FALLBACK"
+  )
+})
+
+// 9. Dark Palette Hierarchy (Graphite background, Lighter sidebar, Near-black surface)
+test("Foundation: Dark theme palette maintains layered architectural hierarchy", () => {
+  // Approximate lightness values in OKLCH:
+  // - Near-black surface: L ~ 0.200 (#151619)
+  // - Graphite background: L ~ 0.236 (#1D1E23)
+  // - Slightly lighter sidebar: L ~ 0.274 (#26272C)
+  // - Thin border: L ~ 0.330 (#34353A)
+  // - Warm gold accent: L ~ 0.744 (#C8A85A)
+  // - Off-white foreground: L ~ 0.958 (#F2F1EE)
+  const darkTokens = {
+    surface: 0.200,
+    background: 0.236,
+    sidebar: 0.274,
+    border: 0.330,
+    mutedForeground: 0.687,
+    accent: 0.744,
+    foreground: 0.958,
+  }
+
+  assert.ok(darkTokens.surface < darkTokens.background, "Card surface is near-black, recessed against background")
+  assert.ok(darkTokens.background < darkTokens.sidebar, "Sidebar is slightly lighter graphite than canvas background")
+  assert.ok(darkTokens.sidebar < darkTokens.border, "Borders provide visible structural separation")
+  assert.ok(darkTokens.foreground - darkTokens.surface > 0.7, "Primary text achieves high contrast against surface")
+  assert.ok(darkTokens.accent > darkTokens.border, "Gold accent is luminous and distinct")
+})

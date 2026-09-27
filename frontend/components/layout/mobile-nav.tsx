@@ -94,11 +94,11 @@ export function MobileNav({
                       className={cn(
                         "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[14px] transition-colors font-sans",
                         isActive
-                          ? "bg-sidebar-accent text-foreground font-medium border-l-2 border-foreground"
+                          ? "bg-sidebar-accent text-foreground font-medium border-l-2 border-accent"
                           : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                       )}
                     >
-                      <Icon className={cn("size-3.5 shrink-0", isActive ? "text-foreground" : "text-muted-foreground")} />
+                      <Icon className={cn("size-3.5 shrink-0", isActive ? "text-accent" : "text-muted-foreground")} />
                       <span className="truncate">{item.title}</span>
                     </Link>
                   )

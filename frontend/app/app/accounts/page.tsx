@@ -24,6 +24,9 @@ export default function AccountsPage() {
   const filteredAccounts = React.useMemo(() => {
     if (!accounts) return []
     return accounts.filter((account) => {
+      // Exclude system accounts (SYSTEM_CLEARING, SYSTEM_TREASURY) from retail user accounts UI
+      if (account.accountType !== "USER_CHECKING") return false
+
       const matchesSearch =
         !searchTerm.trim() ||
         account.accountNumber.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
@@ -112,13 +115,15 @@ export default function AccountsPage() {
         description="All user-owned checking accounts provisioned in the ledger."
       >
         <div className="border border-border/70 rounded-sm overflow-hidden">
-          <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/30 text-[13px] text-muted-foreground font-medium border-b border-border/70">
-            <span className="col-span-4">Account ID & Number</span>
-            <span className="col-span-2">Type</span>
-            <span className="col-span-2">Currency</span>
-            <span className="col-span-2">Status</span>
-            <span className="col-span-2 text-right">Available Balance</span>
-          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/30 text-[13px] text-muted-foreground font-medium border-b border-border/70">
+                <span className="col-span-4">Account ID & Number</span>
+                <span className="col-span-2">Type</span>
+                <span className="col-span-2">Currency</span>
+                <span className="col-span-2">Status</span>
+                <span className="col-span-2 text-right">Available Balance</span>
+              </div>
 
           {isLoading ? (
             <div className="divide-y divide-border/50 bg-card">
@@ -251,6 +256,8 @@ export default function AccountsPage() {
               ))}
             </div>
           )}
+            </div>
+          </div>
         </div>
       </Section>
 
