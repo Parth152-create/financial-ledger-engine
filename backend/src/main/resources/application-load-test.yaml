@@ -1,0 +1,15 @@
+# ==============================================================================
+# Financial Ledger Engine - Load-Test Profile Configuration
+# ==============================================================================
+# Activates an elevated financial mutation rate limit for load and performance testing.
+# Default production security controls (authentication, CSRF, idempotency, locks)
+# and Redis-backed distributed rate limiting remain fully enforced.
+# ==============================================================================
+
+ledger:
+  rate-limit:
+    load-test:
+      enabled: true
+      financial:
+        max-attempts: ${RATE_LIMIT_LOAD_TEST_FINANCIAL_MAX_ATTEMPTS:1000}
+        window-seconds: ${RATE_LIMIT_LOAD_TEST_FINANCIAL_WINDOW_SECONDS:60}

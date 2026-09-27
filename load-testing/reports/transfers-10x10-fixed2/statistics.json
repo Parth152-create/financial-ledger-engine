@@ -1,0 +1,50 @@
+{
+  "POST /api/v1/auth/login" : {
+    "transaction" : "POST /api/v1/auth/login",
+    "sampleCount" : 10,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 295.1,
+    "medianResTime" : 295.5,
+    "minResTime" : 278.0,
+    "maxResTime" : 306.0,
+    "pct1ResTime" : 305.9,
+    "pct2ResTime" : 306.0,
+    "pct3ResTime" : 306.0,
+    "throughput" : 2.092487968194183,
+    "receivedKBytesPerSec" : 1.6633644590918601,
+    "sentKBytesPerSec" : 0.5026875392341494
+  },
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 110,
+    "errorCount" : 100,
+    "errorPct" : 90.90909,
+    "meanResTime" : 27.181818181818187,
+    "medianResTime" : 0.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 306.0,
+    "pct1ResTime" : 1.0,
+    "pct2ResTime" : 295.45,
+    "pct3ResTime" : 305.89,
+    "throughput" : 22.964509394572026,
+    "receivedKBytesPerSec" : 14.931824112734864,
+    "sentKBytesPerSec" : 13.021512917536535
+  },
+  "POST /api/v1/transfers" : {
+    "transaction" : "POST /api/v1/transfers",
+    "sampleCount" : 100,
+    "errorCount" : 100,
+    "errorPct" : 100.0,
+    "meanResTime" : 0.39,
+    "medianResTime" : 0.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 1.0,
+    "pct1ResTime" : 1.0,
+    "pct2ResTime" : 1.0,
+    "pct3ResTime" : 1.0,
+    "throughput" : 23.457658925639223,
+    "receivedKBytesPerSec" : 14.91302339901478,
+    "sentKBytesPerSec" : 14.067722994370163
+  }
+}

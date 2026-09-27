@@ -443,4 +443,37 @@ class RateLimitingIntegrationTest extends BaseIntegrationTest {
         assertThat(verifiedBob.getBalance()).isEqualByComparingTo(new BigDecimal("600.0000"));
         assertThat(ledgerEntryRepository.count()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("13. Default financial rate limit configuration is 100 requests / 60 seconds with load-test mode inactive")
+    void defaultConfigurationMaintains100RequestsPer60Seconds() {
+        RateLimitProperties props = rateLimiterService.getProperties();
+        assertThat(props.enabled()).isTrue();
+        assertThat(props.loadTest().enabled()).isFalse();
+
+        RateLimitProperties.LimitConfig financialLimit = props.financial();
+        assertThat(financialLimit.maxAttempts()).isEqualTo(100);
+        assertThat(financialLimit.windowSeconds()).isEqualTo(60);
+
+        RateLimitProperties.LimitConfig effectiveLimit = rateLimiterService.getEffectiveFinancialLimit();
+        assertThat(effectiveLimit.maxAttempts()).isEqualTo(100);
+        assertThat(effectiveLimit.windowSeconds()).isEqualTo(60);
+    }
+
+    @Test
+    @DisplayName("14. Default financial rate limit allows exactly 100 requests and rejects 101st with 429")
+    void defaultFinancialRateLimitAllows100AndRejects101() {
+        String testIdentifier = "user:default-rl-test-" + UUID.randomUUID();
+
+        // 100 requests succeed under default threshold
+        for (int i = 1; i <= 100; i++) {
+            rateLimiterService.checkAndRecordFinancial(testIdentifier);
+        }
+
+        // 101st request exceeds default threshold and throws RateLimitExceededException
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RateLimitExceededException.class,
+                () -> rateLimiterService.checkAndRecordFinancial(testIdentifier)
+        );
+    }
 }

@@ -68,8 +68,13 @@ ledger:
       max-attempts: ${RATE_LIMIT_SIGNUP_MAX_ATTEMPTS:10}
       window-seconds: ${RATE_LIMIT_SIGNUP_WINDOW_SECONDS:60}
     financial:
-      max-requests: ${RATE_LIMIT_FINANCIAL_MAX_REQUESTS:100}
+      max-attempts: ${RATE_LIMIT_FINANCIAL_MAX_ATTEMPTS:${RATE_LIMIT_FINANCIAL_MAX_REQUESTS:100}}
       window-seconds: ${RATE_LIMIT_FINANCIAL_WINDOW_SECONDS:60}
+    load-test:
+      enabled: ${RATE_LIMIT_LOAD_TEST_ENABLED:false}
+      financial:
+        max-attempts: ${RATE_LIMIT_LOAD_TEST_FINANCIAL_MAX_ATTEMPTS:1000}
+        window-seconds: ${RATE_LIMIT_LOAD_TEST_FINANCIAL_WINDOW_SECONDS:60}
 
   security:
     admin-emails: ${LEDGER_ADMIN_EMAILS:admin@ledger.com}

@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+
+    <TestPlan guiclass="TestPlanGui"
+              testclass="TestPlan"
+              testname="Financial Ledger Engine - Concurrent Transfers"
+              enabled="true">
+      <stringProp name="TestPlan.comments">Controlled concurrent transfer workload</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.user_define_classpath">false</boolProp>
+    </TestPlan>
+
+    <hashTree>
+
+      <Arguments guiclass="ArgumentsPanel"
+                 testclass="Arguments"
+                 testname="Test Configuration"
+                 enabled="true">
+        <collectionProp name="Arguments.arguments">
+
+          <elementProp name="HOST" elementType="Argument">
+            <stringProp name="Argument.name">HOST</stringProp>
+            <stringProp name="Argument.value">${__P(HOST,localhost)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+          <elementProp name="PORT" elementType="Argument">
+            <stringProp name="Argument.name">PORT</stringProp>
+            <stringProp name="Argument.value">${__P(PORT,8085)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+          <elementProp name="TEST_EMAIL" elementType="Argument">
+            <stringProp name="Argument.name">TEST_EMAIL</stringProp>
+            <stringProp name="Argument.value">${__P(TEST_EMAIL,)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+          <elementProp name="TEST_PASSWORD" elementType="Argument">
+            <stringProp name="Argument.name">TEST_PASSWORD</stringProp>
+            <stringProp name="Argument.value">${__P(TEST_PASSWORD,)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+          <elementProp name="SOURCE_ACCOUNT_ID" elementType="Argument">
+            <stringProp name="Argument.name">SOURCE_ACCOUNT_ID</stringProp>
+            <stringProp name="Argument.value">${__P(SOURCE_ACCOUNT_ID,)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+          <elementProp name="DESTINATION_ACCOUNT_ID" elementType="Argument">
+            <stringProp name="Argument.name">DESTINATION_ACCOUNT_ID</stringProp>
+            <stringProp name="Argument.value">${__P(DESTINATION_ACCOUNT_ID,)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+
+        </collectionProp>
+      </Arguments>
+
+      <hashTree/>
+
+      <ThreadGroup guiclass="ThreadGroupGui"
+                   testclass="ThreadGroup"
+                   testname="Concurrent Transfer Workload"
+                   enabled="true">
+
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+
+        <elementProp name="ThreadGroup.main_controller"
+                     elementType="LoopController">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${__P(LOOPS,10)}</stringProp>
+        </elementProp>
+
+        <stringProp name="ThreadGroup.num_threads">${__P(THREADS,10)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(RAMP_UP,5)}</stringProp>
+
+        <longProp name="ThreadGroup.start_time">0</longProp>
+        <longProp name="ThreadGroup.end_time">0</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+
+      </ThreadGroup>
+
+      <hashTree>
+
+        <!-- Cookie Manager -->
+        <CookieManager guiclass="CookiePanel"
+                       testclass="CookieManager"
+                       testname="HTTP Cookie Manager"
+                       enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">false</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+          <boolProp name="CookieManager.save.cookies">true</boolProp>
+          <stringProp name="CookieManager.namePrefix">COOKIE_</stringProp>
+        </CookieManager>
+
+        <hashTree/>
+
+        <!-- ===================================================== -->
+        <!-- Authentication setup                                  -->
+        <!-- ===================================================== -->
+
+        <OnceOnlyController guiclass="OnceOnlyControllerGui"
+                             testclass="OnceOnlyController"
+                             testname="Authentication Setup"
+                             enabled="true"/>
+
+        <hashTree>
+
+          <!-- Login -->
+
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui"
+                            testclass="HTTPSamplerProxy"
+                            testname="POST /api/v1/auth/login"
+                            enabled="true">
+
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+
+            <elementProp name="HTTPsampler.Arguments"
+                         elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+
+                <elementProp name=""
+                             elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{"email":"${TEST_EMAIL}","password":"${TEST_PASSWORD}"}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                  <boolProp name="HTTPArgument.use_equals">true</boolProp>
+                </elementProp>
+
+              </collectionProp>
+            </elementProp>
+
+            <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+            <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+            <stringProp name="HTTPSampler.protocol">http</stringProp>
+            <stringProp name="HTTPSampler.path">/api/v1/auth/login</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+
+          </HTTPSamplerProxy>
+
+          <hashTree>
+
+            <HeaderManager guiclass="HeaderPanel"
+                           testclass="HeaderManager"
+                           testname="Login Headers"
+                           enabled="true">
+              <collectionProp name="HeaderManager.headers">
+
+                <elementProp name=""
+                             elementType="Header">
+                  <stringProp name="Header.name">Content-Type</stringProp>
+                  <stringProp name="Header.value">application/json</stringProp>
+                </elementProp>
+
+              </collectionProp>
+            </HeaderManager>
+
+            <hashTree/>
+
+          </hashTree>
+
+          <!-- =================================================== -->
+          <!-- Explicit CSRF endpoint                              -->
+          <!-- =================================================== -->
+
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui"
+                            testclass="HTTPSamplerProxy"
+                            testname="GET /api/v1/auth/csrf"
+                            enabled="true">
+
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+
+            <elementProp name="HTTPsampler.Arguments"
+                         elementType="Arguments">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+
+            <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+            <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+            <stringProp name="HTTPSampler.protocol">http</stringProp>
+            <stringProp name="HTTPSampler.path">/api/v1/auth/csrf</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+
+          </HTTPSamplerProxy>
+
+          <hashTree>
+
+            <!-- Extract the actual XSRF-TOKEN cookie -->
+            <JSR223PostProcessor guiclass="TestBeanGUI"
+                                 testclass="JSR223PostProcessor"
+                                 testname="Extract XSRF Token"
+                                 enabled="true">
+
+              <stringProp name="cacheKey">false</stringProp>
+              <stringProp name="filename"></stringProp>
+              <stringProp name="parameters"></stringProp>
+              <stringProp name="scriptLanguage">groovy</stringProp>
+
+              <stringProp name="script"><![CDATA[
+def token = null
+def manager = sampler.getCookieManager()
+if (manager != null) {
+    for (int i = 0; i < manager.getCookieCount(); i++) {
+        def cookie = manager.get(i)
+        if ("XSRF-TOKEN".equalsIgnoreCase(cookie.getName())) {
+            token = cookie.getValue()
+            break
+        }
+    }
+}
+
+if (token == null || token.isEmpty()) {
+    def headers = prev.getResponseHeaders()
+    if (headers != null) {
+        def matcher = (headers =~ /(?i)Set-Cookie:\s*XSRF-TOKEN=([^;]+)/)
+        if (matcher.find()) {
+            token = matcher.group(1).trim()
+        }
+    }
+}
+
+if (token != null && !token.isEmpty()) {
+    vars.put('CSRF_TOKEN', token)
+    vars.put('COOKIE_XSRF-TOKEN', token)
+    log.info('XSRF-TOKEN cookie found, length=' + token.length())
+} else {
+    vars.put('CSRF_TOKEN', '')
+    vars.put('COOKIE_XSRF-TOKEN', '')
+    log.error('XSRF-TOKEN cookie NOT FOUND')
+}
+              ]]></stringProp>
+
+            </JSR223PostProcessor>
+
+            <hashTree/>
+
+          </hashTree>
+
+        </hashTree>
+
+        <!-- ===================================================== -->
+        <!-- Transfer workload                                     -->
+        <!-- ===================================================== -->
+
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui"
+                          testclass="HTTPSamplerProxy"
+                          testname="POST /api/v1/transfers"
+                          enabled="true">
+
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+
+          <elementProp name="HTTPsampler.Arguments"
+                       elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+
+              <elementProp name=""
+                           elementType="HTTPArgument">
+
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+
+                <stringProp name="Argument.value">{"sourceAccountId":"${SOURCE_ACCOUNT_ID}","destinationAccountId":"${DESTINATION_ACCOUNT_ID}","amount":10.00,"currency":"INR","description":"JMeter concurrent transfer"}</stringProp>
+
+                <stringProp name="Argument.metadata">=</stringProp>
+                <boolProp name="HTTPArgument.use_equals">true</boolProp>
+
+              </elementProp>
+
+            </collectionProp>
+          </elementProp>
+
+          <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+          <stringProp name="HTTPSampler.port">${PORT}</stringProp>
+          <stringProp name="HTTPSampler.protocol">http</stringProp>
+          <stringProp name="HTTPSampler.path">/api/v1/transfers</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+
+        </HTTPSamplerProxy>
+
+        <hashTree>
+
+          <HeaderManager guiclass="HeaderPanel"
+                         testclass="HeaderManager"
+                         testname="Transfer Headers"
+                         enabled="true">
+
+            <collectionProp name="HeaderManager.headers">
+
+              <elementProp name=""
+                           elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+
+              <elementProp name=""
+                           elementType="Header">
+                <stringProp name="Header.name">X-XSRF-TOKEN</stringProp>
+                <stringProp name="Header.value">${COOKIE_XSRF-TOKEN}</stringProp>
+              </elementProp>
+
+              <elementProp name=""
+                           elementType="Header">
+                <stringProp name="Header.name">Idempotency-Key</stringProp>
+                <stringProp name="Header.value">JMeter-${__threadNum}-${__iteration()}-${__UUID()}</stringProp>
+              </elementProp>
+
+            </collectionProp>
+
+          </HeaderManager>
+
+          <hashTree/>
+
+          <ResponseAssertion guiclass="AssertionGui"
+                             testclass="ResponseAssertion"
+                             testname="Transfer HTTP 200"
+                             enabled="true">
+
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">8</intProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+
+          </ResponseAssertion>
+
+          <hashTree/>
+
+        </hashTree>
+
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

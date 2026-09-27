@@ -48,6 +48,18 @@ public class RedisRateLimiterService {
     public RedisRateLimiterService(StringRedisTemplate redisTemplate, RateLimitProperties properties) {
         this.redisTemplate = redisTemplate;
         this.properties = properties;
+        if (properties.enabled()) {
+            RateLimitProperties.LimitConfig fin = properties.effectiveFinancial();
+            if (properties.loadTest() != null && properties.loadTest().enabled()) {
+                log.info("Rate limiting enabled. Load-test override ACTIVE: financial limit = {}/{}s",
+                        fin.maxAttempts(), fin.windowSeconds());
+            } else {
+                log.info("Rate limiting enabled: financial limit = {}/{}s, login limit = {}/{}s, signup limit = {}/{}s",
+                        fin.maxAttempts(), fin.windowSeconds(),
+                        properties.login().maxAttempts(), properties.login().windowSeconds(),
+                        properties.signup().maxAttempts(), properties.signup().windowSeconds());
+            }
+        }
     }
 
     public void checkLoginAllowed(String clientIp, String email) {
@@ -125,12 +137,13 @@ public class RedisRateLimiterService {
         }
 
         try {
-            List<?> result = executeIncr(financialKey(keyIdentifier), properties.financial().windowSeconds());
+            RateLimitProperties.LimitConfig limit = properties.effectiveFinancial();
+            List<?> result = executeIncr(financialKey(keyIdentifier), limit.windowSeconds());
             if (result != null && result.size() >= 2) {
                 long current = ((Number) result.get(0)).longValue();
                 long ttl = ((Number) result.get(1)).longValue();
-                if (current > properties.financial().maxAttempts()) {
-                    long retryAfter = ttl > 0 ? ttl : properties.financial().windowSeconds();
+                if (current > limit.maxAttempts()) {
+                    long retryAfter = ttl > 0 ? ttl : limit.windowSeconds();
                     throw new RateLimitExceededException("Too many financial operations. Please try again later.", retryAfter);
                 }
             }
@@ -178,6 +191,14 @@ public class RedisRateLimiterService {
 
     public String financialKey(String keyIdentifier) {
         return FINANCIAL_PREFIX + keyIdentifier;
+    }
+
+    public RateLimitProperties.LimitConfig getEffectiveFinancialLimit() {
+        return properties.effectiveFinancial();
+    }
+
+    public RateLimitProperties getProperties() {
+        return properties;
     }
 
     public static String normalizeEmail(String email) {
