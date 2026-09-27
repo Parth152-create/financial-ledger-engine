@@ -10,6 +10,8 @@ import com.parth.ledger.security.dto.SignupRequestDto;
 import com.parth.ledger.user.User;
 import com.parth.ledger.user.UserService;
 import com.parth.ledger.user.dto.UserResponseDto;
+import com.parth.ledger.security.ratelimit.ClientIpResolver;
+import com.parth.ledger.security.ratelimit.RedisRateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -18,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,10 +34,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Controller handling authentication and identity verification endpoints.
- * Supports session retrieval, email/password signup, email/password login, and credential linking.
- */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -45,19 +44,25 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService customUserDetailsService;
     private final SecurityContextRepository securityContextRepository;
+    private final RedisRateLimiterService rateLimiterService;
+    private final ClientIpResolver clientIpResolver;
 
     public AuthController(AuthenticatedUserService authenticatedUserService,
                           UserAuthService userAuthService,
                           UserService userService,
                           AuthenticationManager authenticationManager,
                           CustomUserDetailsService customUserDetailsService,
-                          SecurityContextRepository securityContextRepository) {
+                          SecurityContextRepository securityContextRepository,
+                          RedisRateLimiterService rateLimiterService,
+                          ClientIpResolver clientIpResolver) {
         this.authenticatedUserService = authenticatedUserService;
         this.userAuthService = userAuthService;
         this.userService = userService;
         this.authenticationManager = authenticationManager;
         this.customUserDetailsService = customUserDetailsService;
         this.securityContextRepository = securityContextRepository;
+        this.rateLimiterService = rateLimiterService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /**
@@ -105,13 +110,14 @@ public class AuthController {
     public ResponseEntity<UserResponseDto> signup(@Valid @RequestBody SignupRequestDto request,
                                                   HttpServletRequest httpRequest,
                                                   HttpServletResponse httpResponse) {
+        String clientIp = clientIpResolver.resolveClientIp(httpRequest);
+        rateLimiterService.checkAndRecordSignup(clientIp);
+
         User user = userAuthService.signup(request);
 
-        // Establish authenticated session immediately upon successful signup
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(user.getEmail());
         Authentication auth = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
-        // Rotate session ID to protect against session fixation attacks before establishing authenticated session
         if (httpRequest.getSession(false) != null) {
             httpRequest.changeSessionId();
         } else {
@@ -126,25 +132,27 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(UserResponseDto.from(user));
     }
 
-    /**
-     * Authenticates a user with email and password, creating a Spring Security session.
-     *
-     * @param request Validated login payload.
-     * @param httpRequest The HTTP servlet request.
-     * @param httpResponse The HTTP servlet response.
-     * @return 200 OK with safe UserResponseDto.
-     */
     @PostMapping("/login")
     public ResponseEntity<UserResponseDto> login(@Valid @RequestBody LoginRequestDto request,
                                                  HttpServletRequest httpRequest,
                                                  HttpServletResponse httpResponse) {
         String normalizedEmail = request.normalizedEmail();
+        String clientIp = clientIpResolver.resolveClientIp(httpRequest);
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(normalizedEmail, request.password())
-        );
+        rateLimiterService.checkLoginAllowed(clientIp, normalizedEmail);
 
-        // Rotate session ID to protect against session fixation attacks before establishing authenticated session
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(normalizedEmail, request.password())
+            );
+        } catch (AuthenticationException ex) {
+            rateLimiterService.recordFailedLogin(clientIp, normalizedEmail);
+            throw ex;
+        }
+
+        rateLimiterService.recordSuccessfulLogin(clientIp, normalizedEmail);
+
         if (httpRequest.getSession(false) != null) {
             httpRequest.changeSessionId();
         } else {

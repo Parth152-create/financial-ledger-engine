@@ -13,10 +13,12 @@ import com.parth.ledger.security.AccountOwnershipException;
 import com.parth.ledger.security.DuplicateEmailException;
 import com.parth.ledger.security.InvalidPasswordException;
 import com.parth.ledger.security.UserNotFoundException;
+import com.parth.ledger.security.ratelimit.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -317,6 +319,20 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(RateLimitExceededException ex, HttpServletRequest request) {
+        log.warn("Rate limit exceeded for {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(),
+                "Too many requests. Please try again later.",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(response);
     }
 
     @ExceptionHandler(Exception.class)
