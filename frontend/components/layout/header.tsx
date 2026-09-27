@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { Menu, Search } from "lucide-react"
+import { Menu } from "lucide-react"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { SITE_CONFIG } from "@/config/site"
 import { useAuth } from "@/hooks/auth/use-auth"
@@ -27,7 +27,7 @@ export function Header({
           type="button"
           onClick={onOpenMobileNav}
           aria-label="Open navigation menu"
-          className="md:hidden p-1.5 rounded-sm border border-border text-foreground hover:bg-muted transition-colors"
+          className="md:hidden p-1.5 rounded-sm border border-border text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <Menu className="size-4" />
         </button>
@@ -40,16 +40,16 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-sm border border-border/80 bg-muted/30 text-[13px] text-muted-foreground">
-          <Search className="size-3.5 text-muted-foreground/60" />
-          <span className="text-xs">Search transactions, accounts...</span>
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xs border border-border/80 bg-muted/40 text-[11.5px] font-mono text-muted-foreground select-none">
+          <span className="size-1.5 rounded-full bg-emerald-500" />
+          <span>INR LEDGER</span>
         </div>
 
         <ThemeToggle />
 
         {user && (
           <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-border text-[13px]">
-            <span className="font-medium text-foreground truncate max-w-[140px]">{user.name}</span>
+            <span className="font-medium text-foreground truncate max-w-[160px]">{user.name}</span>
           </div>
         )}
       </div>

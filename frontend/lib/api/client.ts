@@ -8,6 +8,47 @@ export interface RequestOptions extends Omit<RequestInit, "body"> {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8085"
 
+/**
+ * Extracts the XSRF-TOKEN cookie value if running in the browser.
+ */
+export function getCsrfTokenFromCookie(): string | null {
+  if (typeof document === "undefined") {
+    return null
+  }
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/**
+ * Proactively fetches the CSRF token from the backend /api/v1/auth/csrf endpoint
+ * if the cookie is not present yet. This sets the XSRF-TOKEN cookie on the browser.
+ */
+export async function ensureCsrfToken(): Promise<string | null> {
+  const existing = getCsrfTokenFromCookie()
+  if (existing) {
+    return existing
+  }
+  if (typeof window === "undefined") {
+    return null
+  }
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/csrf`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    })
+    if (!res.ok) {
+      return null
+    }
+    const data = (await res.json()) as { token?: string }
+    return data.token || getCsrfTokenFromCookie()
+  } catch {
+    return null
+  }
+}
+
 function buildUrl(endpoint: string, params?: RequestOptions["params"]): string {
   const url = new URL(endpoint.startsWith("http") ? endpoint : `${BASE_URL}${endpoint}`)
   if (params) {
@@ -57,6 +98,21 @@ async function request<T>(
   const resolvedHeaders: Record<string, string> = {
     Accept: "application/json",
     ...(headers as Record<string, string>),
+  }
+
+  const method = (fetchOptions.method || "GET").toUpperCase()
+  const isMutating = ["POST", "PUT", "PATCH", "DELETE"].includes(method)
+
+  if (isMutating && typeof window !== "undefined") {
+    if (!resolvedHeaders["X-XSRF-TOKEN"] && !resolvedHeaders["X-CSRF-TOKEN"]) {
+      let csrfToken = getCsrfTokenFromCookie()
+      if (!csrfToken) {
+        csrfToken = await ensureCsrfToken()
+      }
+      if (csrfToken) {
+        resolvedHeaders["X-XSRF-TOKEN"] = csrfToken
+      }
+    }
   }
 
   if (body !== undefined && !(body instanceof FormData)) {
@@ -116,5 +172,13 @@ export const apiClient = {
 
   getBaseUrl(): string {
     return BASE_URL
+  },
+
+  getCsrfToken(): string | null {
+    return getCsrfTokenFromCookie()
+  },
+
+  ensureCsrf(): Promise<string | null> {
+    return ensureCsrfToken()
   },
 }

@@ -15,13 +15,17 @@ export function Sidebar({ className }: { className?: string }) {
 
   return (
     <aside
+      aria-label="Application sidebar"
       className={cn(
         "flex flex-col h-full bg-sidebar border-r border-sidebar-border select-none text-sidebar-foreground",
         className
       )}
     >
       <div className="h-13 flex items-center px-4 border-b border-sidebar-border bg-sidebar">
-        <Link href="/app" className="flex items-center gap-2.5">
+        <Link
+          href="/app"
+          className="flex items-center gap-2.5 outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-xs"
+        >
           <div className="size-6.5 rounded-sm bg-foreground text-background flex items-center justify-center font-bold text-xs tracking-tight">
             FL
           </div>
@@ -36,7 +40,7 @@ export function Sidebar({ className }: { className?: string }) {
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+      <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
         {sections.map((sectionName) => {
           const items = SITE_CONFIG.navigation.filter(
             (item) => item.section === sectionName
@@ -59,7 +63,7 @@ export function Sidebar({ className }: { className?: string }) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[14px] transition-colors font-sans",
+                      "flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[14px] transition-colors font-sans outline-none focus-visible:ring-1 focus-visible:ring-ring",
                       isActive
                         ? "bg-sidebar-accent text-foreground font-medium border-l-2 border-foreground"
                         : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
@@ -91,7 +95,7 @@ export function Sidebar({ className }: { className?: string }) {
               onClick={() => logout()}
               title="Sign Out"
               aria-label="Sign Out"
-              className="p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               <LogOut className="size-3.5" />
             </button>

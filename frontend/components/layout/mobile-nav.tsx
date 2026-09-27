@@ -22,6 +22,16 @@ export function MobileNav({
     onClose()
   }, [pathname, onClose])
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const sections = ["Operations", "Audit & Reporting", "System"] as const
@@ -33,7 +43,12 @@ export function MobileNav({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative flex flex-col w-64 max-w-[80vw] h-full bg-sidebar border-r border-sidebar-border z-10 animate-in slide-in-from-left duration-150">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className="relative flex flex-col w-64 max-w-[80vw] h-full bg-sidebar border-r border-sidebar-border z-10 animate-in slide-in-from-left duration-150"
+      >
         <div className="h-13 flex items-center justify-between px-4 border-b border-sidebar-border bg-sidebar">
           <div className="flex items-center gap-2">
             <div className="size-6 rounded-sm bg-foreground text-background flex items-center justify-center font-bold text-xs tracking-tight">
