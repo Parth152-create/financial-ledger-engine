@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -116,6 +117,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-type-01")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -153,6 +155,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-user-01")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -204,6 +207,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-desc-01")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -225,6 +229,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-desc-null")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -355,6 +360,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
 
         // First call
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-idem-desc")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -364,6 +370,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
 
         // Identical retry
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-idem-desc")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -384,6 +391,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-conflict-desc")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request1)))
@@ -398,6 +406,7 @@ class TransactionModelHardeningIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v3-conflict-desc")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request2)))

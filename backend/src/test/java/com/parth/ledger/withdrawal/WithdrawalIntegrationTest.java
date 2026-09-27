@@ -71,6 +71,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -202,6 +203,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-basic-001")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -370,6 +372,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-007")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -388,6 +391,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-008")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -406,6 +410,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-009")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -426,6 +431,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-010")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(malformedJson))
@@ -443,6 +449,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-011")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -477,6 +484,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -493,6 +501,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "   ")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -504,6 +513,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
         void malformedJsonIsRejected() throws Exception {
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-015")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{ invalid json }"))
@@ -522,6 +532,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-val-016")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
@@ -546,6 +557,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
             );
 
             mockMvc.perform(post("/api/v1/withdrawals")
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-auth-017")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -565,6 +577,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-auth-018")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -583,6 +596,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-auth-019")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -601,6 +615,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-auth-020")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -631,6 +646,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-life-021")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -654,6 +670,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-life-022")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -683,6 +700,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-bal-023")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -787,6 +805,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-027")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -795,6 +814,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-027")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -815,6 +835,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-028")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -822,6 +843,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-028")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -841,6 +863,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-029")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -848,6 +871,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-029")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -865,6 +889,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-030")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -872,6 +897,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-030")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -890,6 +916,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-031")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -897,6 +924,7 @@ class WithdrawalIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice.withdrawal@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-idem-031")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))

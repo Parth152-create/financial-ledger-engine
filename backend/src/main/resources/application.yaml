@@ -1,5 +1,12 @@
 server:
   port: ${SERVER_PORT:8085}
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
+        secure: ${SESSION_COOKIE_SECURE:false}
+        name: JSESSIONID
 
 spring:
   application:

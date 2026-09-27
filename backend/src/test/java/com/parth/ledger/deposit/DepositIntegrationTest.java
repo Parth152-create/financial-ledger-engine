@@ -71,6 +71,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -183,6 +184,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-basic-001")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -390,6 +392,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-013")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload))
@@ -409,6 +412,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-014")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload))
@@ -428,6 +432,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-015")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload))
@@ -444,6 +449,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-016a")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload1))
@@ -456,6 +462,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-016b")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload2))
@@ -471,6 +478,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
                 mockMvc.perform(post("/api/v1/deposits")
                                 .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                                 .header("Idempotency-Key", "dep-val-017-" + curr)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
@@ -491,6 +499,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-018")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -513,6 +522,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-019")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -541,6 +551,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-020")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -567,6 +578,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-021")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -589,6 +601,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             );
 
             mockMvc.perform(post("/api/v1/deposits")
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-022")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -606,6 +619,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
@@ -619,6 +633,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-val-024")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(payload))
@@ -649,6 +664,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-clr-025")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -756,6 +772,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             // First request: 201 Created
             String firstResponse = mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-030")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -767,6 +784,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
             // Identical retry: 200 OK
             String secondResponse = mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-030")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -816,6 +834,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-032")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -823,6 +842,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-032")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -841,6 +861,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-033")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -848,6 +869,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-033")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -881,6 +903,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-035")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
@@ -888,6 +911,7 @@ class DepositIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice.deposit@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-idem-035")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))

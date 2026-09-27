@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -311,6 +312,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-active-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -338,6 +340,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-src-frozen")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -368,6 +371,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-dst-frozen")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -399,6 +403,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-src-closed")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -430,6 +435,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-dst-closed")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -464,6 +470,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-dst-clearing")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -495,6 +502,7 @@ class AccountModelIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "tx-v2-src-clearing")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

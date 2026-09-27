@@ -105,4 +105,26 @@ class CorsIntegrationTest extends BaseIntegrationTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
     }
+
+    @Test
+    @DisplayName("7. Preflight OPTIONS request from localhost:3001 development origin succeeds (200 OK)")
+    void preflightAllowedOriginLocalhost3001Succeeds() throws Exception {
+        mockMvc.perform(options("/api/v1/accounts")
+                        .header("Origin", "http://localhost:3001")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type,Idempotency-Key,X-XSRF-TOKEN"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3001"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
+    @DisplayName("8. Credentialed CORS does not use wildcard origin and rejects unconfigured origin")
+    void credentialedCorsDoesNotUseWildcard() throws Exception {
+        mockMvc.perform(options("/api/v1/transfers")
+                        .header("Origin", "http://untrusted-attacker.com")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
 }

@@ -24,6 +24,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -82,6 +83,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-tx-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -107,6 +109,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -125,6 +128,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-insufficient-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -144,6 +148,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-same-acc-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -163,6 +168,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-mismatch-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -183,6 +189,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
 
         // First transfer succeeds
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-conflict-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request1)))
@@ -197,6 +204,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-conflict-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request2)))
@@ -216,6 +224,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         String firstResponse = mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-retry-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -223,6 +232,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         String secondResponse = mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-retry-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -248,6 +258,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-notfound-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -269,6 +280,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 """.formatted(aliceUsdAccount.getId(), bobUsdAccount.getId());
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "api-invalid-amount")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidJson))

@@ -51,6 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -183,7 +184,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("1. ACTIVE → FROZEN succeeds (200 OK)")
         void activeToFrozenSuccess() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("FROZEN")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -200,7 +202,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("FROZEN")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -216,7 +219,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("ACTIVE")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -230,7 +234,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("4. ACTIVE → ACTIVE unfreeze rejected with 422 Unprocessable Content")
         void activeToActiveUnfreezeRejected() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status", is(422)))
                     .andExpect(jsonPath("$.message", containsString("already ACTIVE")));
@@ -243,7 +248,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("5. ACTIVE zero-balance → CLOSED succeeds (200 OK)")
         void activeZeroBalanceToClosedSuccess() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("CLOSED")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -260,7 +266,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("CLOSED")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -277,7 +284,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("CLOSED")))
                     .andExpect(jsonPath("$.accountId", is(aliceAccount.getId().toString())));
@@ -293,7 +301,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status", is(422)))
                     .andExpect(jsonPath("$.message", containsString("CLOSED")));
@@ -309,7 +318,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status", is(422)))
                     .andExpect(jsonPath("$.message", containsString("CLOSED")));
@@ -333,7 +343,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("100.0000"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status", is(422)))
                     .andExpect(jsonPath("$.message", containsString("non-zero balance")));
@@ -352,7 +363,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             accountRepository.save(aliceAccount);
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status", is(422)))
                     .andExpect(jsonPath("$.message", containsString("non-zero balance")));
@@ -374,7 +386,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("12. Unauthenticated freeze returns 401 Unauthorized")
         void unauthenticatedFreezeRejected() throws Exception {
-            mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze"))
+            mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
+                            .with(csrf()))
                     .andExpect(status().isUnauthorized());
         }
 
@@ -382,7 +395,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("13. Non-admin freeze returns 403 Forbidden")
         void nonAdminFreezeForbidden() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isForbidden());
         }
 
@@ -390,7 +404,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("14. Non-admin unfreeze returns 403 Forbidden")
         void nonAdminUnfreezeForbidden() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isForbidden());
         }
 
@@ -398,7 +413,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("15. Owner can close their own account (200 OK)")
         void ownerCloseSuccess() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status", is("CLOSED")));
         }
@@ -407,7 +423,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("16. Foreign account close returns 404 Not Found (anti-enumeration)")
         void foreignAccountCloseReturns404() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("bob@ledger.com")))
+                            .with(user("bob@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status", is(404)));
         }
@@ -416,7 +433,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("17. SYSTEM_CLEARING freeze rejected (400 Bad Request)")
         void systemClearingFreezeRejected() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + CLEARING_ID + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status", is(400)))
                     .andExpect(jsonPath("$.message", containsString("USER_CHECKING")));
@@ -429,7 +447,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("18. SYSTEM_CLEARING unfreeze rejected (400 Bad Request)")
         void systemClearingUnfreezeRejected() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + CLEARING_ID + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status", is(400)))
                     .andExpect(jsonPath("$.message", containsString("USER_CHECKING")));
@@ -442,7 +461,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
         @DisplayName("19. SYSTEM_CLEARING close returns 404 Not Found")
         void systemClearingCloseReturns404() throws Exception {
             mockMvc.perform(post("/api/v1/accounts/" + CLEARING_ID + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status", is(404)));
 
@@ -468,14 +488,16 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Freeze
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(initialBalance);
 
             // Unfreeze
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             assertThat(accountRepository.findById(aliceAccount.getId()).orElseThrow().getBalance())
                     .isEqualByComparingTo(initialBalance);
@@ -487,13 +509,16 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             long txCountBefore = transactionRepository.count();
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             assertThat(transactionRepository.count()).isEqualTo(txCountBefore);
@@ -505,13 +530,16 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             long ledgerCountBefore = ledgerEntryRepository.count();
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             assertThat(ledgerEntryRepository.count()).isEqualTo(ledgerCountBefore);
@@ -524,7 +552,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Freeze & verify reconciliation
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             SecurityContextHolder.getContext().setAuthentication(
@@ -536,7 +565,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Unfreeze & verify reconciliation
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
@@ -552,7 +582,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Freeze
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
@@ -564,14 +595,16 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Unfreeze and withdraw all to reach balance 0, then close
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
             withdrawalService.executeWithdrawal("wdr-stmt-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("200.0000"), "INR", "Empty"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
@@ -588,7 +621,8 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             fundAccount(aliceUser, aliceAccount, new BigDecimal("100.0000"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/freeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
@@ -599,14 +633,16 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Unfreeze and withdraw all to reach balance 0, then close
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
             withdrawalService.executeWithdrawal("wdr-hist-001", new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Empty"));
 
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/close")
-                            .with(user("alice@ledger.com")))
+                            .with(user("alice@ledger.com"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             setAuthenticatedUser(aliceUser);
@@ -637,6 +673,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "tx-frz-out-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -656,6 +693,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("bob@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "tx-frz-in-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -674,6 +712,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-frz-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -694,6 +733,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-frz-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -710,13 +750,15 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             // Unfreeze
             mockMvc.perform(post("/api/v1/accounts/" + aliceAccount.getId() + "/unfreeze")
-                            .with(user("admin@ledger.com").roles("ADMIN")))
+                            .with(user("admin@ledger.com").roles("ADMIN"))
+                            .with(csrf()))
                     .andExpect(status().isOk());
 
             // 1. Deposit succeeds
             DepositRequestDto depositReq = new DepositRequestDto(aliceAccount.getId(), new BigDecimal("100.0000"), "INR", "Dep");
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-unfrz-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(depositReq)))
@@ -726,6 +768,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             TransferRequestDto transferReq = new TransferRequestDto(aliceAccount.getId(), bobAccount.getId(), new BigDecimal("40.0000"), "INR");
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "tx-unfrz-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(transferReq)))
@@ -735,6 +778,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
             WithdrawalRequestDto withdrawalReq = new WithdrawalRequestDto(aliceAccount.getId(), new BigDecimal("30.0000"), "INR", "Wdr");
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-unfrz-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(withdrawalReq)))
@@ -756,6 +800,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/transfers")
                             .with(user("bob@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "tx-closed-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -774,6 +819,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/deposits")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "dep-closed-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -792,6 +838,7 @@ class AccountLifecycleIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/withdrawals")
                             .with(user("alice@ledger.com"))
+                            .with(csrf())
                             .header("Idempotency-Key", "wdr-closed-01")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))

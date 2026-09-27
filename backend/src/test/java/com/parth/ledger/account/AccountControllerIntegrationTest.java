@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -95,6 +96,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -115,6 +117,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -136,6 +139,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -156,6 +160,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         String responseBody = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -177,6 +182,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -192,6 +198,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         String body1 = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request1)))
                 .andExpect(status().isCreated())
@@ -199,6 +206,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         String body2 = mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request2)))
                 .andExpect(status().isCreated())
@@ -218,6 +226,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
             mockMvc.perform(post("/api/v1/accounts")
                             .with(user("alice.v5@ledger.com"))
+                            .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
@@ -231,6 +240,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // Lowercase
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": \"usd\"}"))
                 .andExpect(status().isBadRequest())
@@ -239,6 +249,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // Too short (2 characters)
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": \"US\"}"))
                 .andExpect(status().isBadRequest())
@@ -247,6 +258,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // Too long (4 characters)
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": \"USDT\"}"))
                 .andExpect(status().isBadRequest())
@@ -255,6 +267,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // Non-alphabetic
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": \"123\"}"))
                 .andExpect(status().isBadRequest())
@@ -267,6 +280,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // null currency
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": null}"))
                 .andExpect(status().isBadRequest())
@@ -275,6 +289,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // blank currency
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\": \"   \"}"))
                 .andExpect(status().isBadRequest())
@@ -283,6 +298,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         // empty JSON object
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())
@@ -296,6 +312,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
@@ -309,6 +326,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
@@ -322,6 +340,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.v5@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
@@ -334,6 +353,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         CreateAccountRequestDto request = new CreateAccountRequestDto("INR");
 
         mockMvc.perform(post("/api/v1/accounts")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());

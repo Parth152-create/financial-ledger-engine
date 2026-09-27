@@ -21,13 +21,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * Controller handling authentication and identity verification endpoints.
@@ -43,22 +45,41 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService customUserDetailsService;
     private final SecurityContextRepository securityContextRepository;
-    private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
 
     public AuthController(AuthenticatedUserService authenticatedUserService,
                           UserAuthService userAuthService,
                           UserService userService,
                           AuthenticationManager authenticationManager,
                           CustomUserDetailsService customUserDetailsService,
-                          SecurityContextRepository securityContextRepository,
-                          SessionAuthenticationStrategy sessionAuthenticationStrategy) {
+                          SecurityContextRepository securityContextRepository) {
         this.authenticatedUserService = authenticatedUserService;
         this.userAuthService = userAuthService;
         this.userService = userService;
         this.authenticationManager = authenticationManager;
         this.customUserDetailsService = customUserDetailsService;
         this.securityContextRepository = securityContextRepository;
-        this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
+    }
+
+    /**
+     * Retrieves current CSRF token metadata for Single Page Applications and triggers cookie issuance.
+     *
+     * @param request The HTTP request containing the CSRF token attribute.
+     * @return 200 OK with CSRF token information.
+     */
+    @GetMapping("/csrf")
+    public ResponseEntity<Map<String, String>> getCsrfToken(HttpServletRequest request) {
+        CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (csrfToken == null) {
+            csrfToken = (CsrfToken) request.getAttribute("_csrf");
+        }
+        if (csrfToken == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(Map.of(
+                "headerName", csrfToken.getHeaderName(),
+                "parameterName", csrfToken.getParameterName(),
+                "token", csrfToken.getToken()
+        ));
     }
 
     /**
@@ -91,7 +112,11 @@ public class AuthController {
         Authentication auth = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
         // Rotate session ID to protect against session fixation attacks before establishing authenticated session
-        sessionAuthenticationStrategy.onAuthentication(auth, httpRequest, httpResponse);
+        if (httpRequest.getSession(false) != null) {
+            httpRequest.changeSessionId();
+        } else {
+            httpRequest.getSession(true);
+        }
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
@@ -120,7 +145,11 @@ public class AuthController {
         );
 
         // Rotate session ID to protect against session fixation attacks before establishing authenticated session
-        sessionAuthenticationStrategy.onAuthentication(authentication, httpRequest, httpResponse);
+        if (httpRequest.getSession(false) != null) {
+            httpRequest.changeSessionId();
+        } else {
+            httpRequest.getSession(true);
+        }
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);

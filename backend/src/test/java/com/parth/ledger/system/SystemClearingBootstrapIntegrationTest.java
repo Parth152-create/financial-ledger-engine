@@ -57,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -222,6 +223,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
         // Perform deposit via API
         String responseJson = mockMvc.perform(post("/api/v1/deposits")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "first-dep-test-02")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -674,6 +676,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -689,6 +692,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -702,6 +706,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -715,6 +720,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/deposits")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "dep-inr-ok")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -730,6 +736,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/deposits")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "dep-usd-fail")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -750,6 +757,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/withdrawals")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "wdr-inr-ok")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -765,6 +773,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/withdrawals")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "wdr-usd-fail")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -790,6 +799,7 @@ class SystemClearingBootstrapIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("alice.sys@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "tf-inr-ok")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

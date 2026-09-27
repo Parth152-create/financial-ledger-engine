@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -109,6 +110,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/v1/transfers")
+                        .with(csrf())
                         .header("Idempotency-Key", "sec-test-unauth-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -127,6 +129,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("alice.sec@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "sec-test-owner-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -156,6 +159,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("bob.sec@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "sec-test-forbidden-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -184,6 +188,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("alice.sec@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "sec-test-dest-other-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -211,6 +216,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("ghost.user@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", "sec-test-unknown-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -298,6 +304,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
         // 1. Alice performs the transfer successfully, populating Redis cache
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("alice.sec@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", idempotencyKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -307,6 +314,7 @@ class TransferSecurityIntegrationTest extends BaseIntegrationTest {
         // 2. Bob attempts to replay the same request with same idempotency key
         mockMvc.perform(post("/api/v1/transfers")
                         .with(user("bob.sec@ledger.com"))
+                        .with(csrf())
                         .header("Idempotency-Key", idempotencyKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

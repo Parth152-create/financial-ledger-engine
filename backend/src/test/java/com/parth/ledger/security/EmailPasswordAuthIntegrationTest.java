@@ -32,6 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -256,8 +257,10 @@ class EmailPasswordAuthIntegrationTest extends BaseIntegrationTest {
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
         assertThat(session).isNotNull();
 
-        // Calling /logout with the session
-        mockMvc.perform(post("/logout").session(session))
+        // Calling /logout with the session and valid CSRF token
+        mockMvc.perform(post("/logout")
+                        .session(session)
+                        .with(csrf()))
                 .andExpect(status().isOk());
 
         // Subsequent authenticated request using the invalidated session returns 401
@@ -301,6 +304,7 @@ class EmailPasswordAuthIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/accounts")
                         .session(session)
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(accountRequest)))
                 .andExpect(status().isCreated())
@@ -343,6 +347,7 @@ class EmailPasswordAuthIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/v1/auth/link-password")
                         .with(user("google.only@example.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(linkDto)))
                 .andExpect(status().isOk());
