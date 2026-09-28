@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button"
 import { LedgerRow } from "@/components/ledger/ledger-row"
 import { TransactionDetailDialog } from "@/components/transactions/transaction-detail-dialog"
 import { useAccountTransactions } from "@/hooks/api/use-transactions"
+import { useAccounts } from "@/hooks/api/use-accounts"
 import { formatDate } from "@/lib/formatters/date"
+import { formatAccountFlowLabel } from "@/lib/formatters/ledger"
 import type {
   TransactionHistoryItem,
   TransactionHistoryParams,
@@ -29,6 +31,7 @@ interface AccountTransactionHistoryProps {
 export function AccountTransactionHistory({
   accountId,
 }: AccountTransactionHistoryProps) {
+  const { data: accounts } = useAccounts()
   const [page, setPage] = React.useState(0)
   const pageSize = 20
 
@@ -260,8 +263,8 @@ export function AccountTransactionHistory({
                 id={tx.transactionId}
                 timestamp={formatDate(tx.createdAt)}
                 type={tx.transactionType}
-                sourceAccount={tx.sourceAccountId ? tx.sourceAccountId.slice(0, 8) : undefined}
-                destinationAccount={tx.destinationAccountId ? tx.destinationAccountId.slice(0, 8) : undefined}
+                sourceAccount={formatAccountFlowLabel(tx.sourceAccountId, accountId, accounts)}
+                destinationAccount={formatAccountFlowLabel(tx.destinationAccountId, accountId, accounts)}
                 direction={tx.direction === "CREDIT" ? "credit" : "debit"}
                 amount={tx.amount}
                 currency={tx.currency}
@@ -315,6 +318,8 @@ export function AccountTransactionHistory({
           if (!open) setSelectedTx(null)
         }}
         transaction={selectedTx}
+        currentAccountId={accountId}
+        accounts={accounts}
       />
     </div>
   )

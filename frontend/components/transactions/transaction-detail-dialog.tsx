@@ -1,14 +1,17 @@
 "use client"
 
 import * as React from "react"
-import { X, ArrowRight, Copy, Check, FileText } from "lucide-react"
+import { X, Copy, Check, FileText, ShieldCheck, ArrowDown, ArrowUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { AmountDisplay } from "@/components/ui/amount-display"
 import { TransactionTypeBadge } from "@/components/ledger/transaction-type-badge"
 import { formatDate } from "@/lib/formatters/date"
+import { formatAccountFlowLabel } from "@/lib/formatters/ledger"
+import { useAccounts } from "@/hooks/api/use-accounts"
 import type { TransactionHistoryItem } from "@/types/transaction"
 import type { StatementEntry } from "@/types/statement"
+import type { Account } from "@/types/account"
 import { cn } from "@/lib/utils"
 
 export type TransactionDetailData =
@@ -34,14 +37,22 @@ interface TransactionDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   transaction: TransactionDetailData | null
+  currentAccountId?: string
+  accounts?: Account[]
 }
 
 export function TransactionDetailDialog({
   open,
   onOpenChange,
   transaction,
+  currentAccountId,
+  accounts: propAccounts,
 }: TransactionDetailDialogProps) {
   const [copied, setCopied] = React.useState(false)
+
+  // Use accounts hook as fallback if propAccounts not provided
+  const { data: queryAccounts } = useAccounts()
+  const accounts = propAccounts || queryAccounts || []
 
   const handleClose = () => {
     setCopied(false)
@@ -67,15 +78,26 @@ export function TransactionDetailDialog({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback
+      // Clipboard fallback
     }
   }
 
   const isCredit = transaction.direction === "CREDIT"
   const sourceAccountId = "sourceAccountId" in transaction ? transaction.sourceAccountId : undefined
   const destinationAccountId = "destinationAccountId" in transaction ? transaction.destinationAccountId : undefined
-  const hasAccounts = Boolean(sourceAccountId && destinationAccountId)
   const balanceAfter = "balanceAfter" in transaction ? transaction.balanceAfter : undefined
+
+  const sourceLabel = formatAccountFlowLabel(sourceAccountId, currentAccountId, accounts)
+  const destinationLabel = formatAccountFlowLabel(destinationAccountId, currentAccountId, accounts)
+
+  const isTransfer = transaction.transactionType === "TRANSFER"
+  const isDeposit = transaction.transactionType === "DEPOSIT"
+  const isWithdrawal = transaction.transactionType === "WITHDRAWAL"
+
+  const formattedAmount = `${transaction.currency === "INR" ? "₹" : ""}${transaction.amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 
   return (
     <div
@@ -89,7 +111,7 @@ export function TransactionDetailDialog({
         onClick={handleClose}
       />
 
-      <div className="relative w-full max-w-lg rounded-sm border border-border bg-card p-5 text-card-foreground shadow-lg space-y-4 z-10 font-sans">
+      <div className="relative w-full max-w-lg rounded-sm border border-border bg-card p-5 text-card-foreground shadow-lg space-y-4 z-10 font-sans max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between pb-3 border-b border-border/70">
           <div className="flex items-center gap-2.5">
             <div className="size-8 rounded-sm bg-muted/60 border border-border flex items-center justify-center text-muted-foreground shrink-0">
@@ -119,6 +141,7 @@ export function TransactionDetailDialog({
           </Button>
         </div>
 
+        {/* Top Summary Banner */}
         <div className="p-3.5 rounded-sm bg-muted/30 border border-border/60 flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -140,6 +163,112 @@ export function TransactionDetailDialog({
           </div>
         </div>
 
+        {/* Double-Entry Financial Movement Presentation */}
+        <div className="rounded-sm border border-border/70 bg-muted/15 p-3.5 space-y-2.5 font-sans">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground tracking-tight">Double-Entry Movement</span>
+            <span className="text-[11px] font-mono text-muted-foreground">Authoritative Ledger</span>
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            {isTransfer && (
+              <>
+                <div className="flex items-center justify-between p-2 rounded-xs border border-border/50 bg-card">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-muted-foreground uppercase tracking-wider block">
+                      Source Account
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">{sourceLabel}</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-foreground">
+                    <ArrowDown className="size-3 text-muted-foreground" />
+                    <span>Debit {formattedAmount}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xs border border-emerald-500/25 bg-emerald-500/5">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
+                      Destination Account
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">{destinationLabel}</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <ArrowUp className="size-3" />
+                    <span>Credit {formattedAmount}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {isDeposit && (
+              <>
+                <div className="flex items-center justify-between p-2 rounded-xs border border-border/50 bg-card">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-muted-foreground uppercase tracking-wider block">
+                      Settlement Source
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">Platform Clearing</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground">
+                    <ArrowDown className="size-3" />
+                    <span>Clearing Settlement</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xs border border-emerald-500/25 bg-emerald-500/5">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
+                      Your Account
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">{destinationLabel}</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <ArrowUp className="size-3" />
+                    <span>Credit {formattedAmount}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {isWithdrawal && (
+              <>
+                <div className="flex items-center justify-between p-2 rounded-xs border border-border/50 bg-card">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-muted-foreground uppercase tracking-wider block">
+                      Your Account
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">{sourceLabel}</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-foreground">
+                    <ArrowDown className="size-3 text-muted-foreground" />
+                    <span>Debit {formattedAmount}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xs border border-border/50 bg-card">
+                  <div>
+                    <span className="text-[10.5px] font-medium text-muted-foreground uppercase tracking-wider block">
+                      Settlement Target
+                    </span>
+                    <span className="font-semibold text-foreground text-xs">Platform Clearing</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground">
+                    <ArrowDown className="size-3" />
+                    <span>External Settlement</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/80 pt-1.5 border-t border-border/40">
+            <ShieldCheck className="size-3.5 text-primary shrink-0" />
+            <span>Ledger entries are immutable. Corrections are recorded as compensating transactions.</span>
+          </div>
+        </div>
+
+        {/* Detailed Fields */}
         <div className="divide-y divide-border/50 text-[13px]">
           <div className="py-2 flex items-center justify-between">
             <span className="text-muted-foreground">Transaction ID</span>
@@ -152,6 +281,7 @@ export function TransactionDetailDialog({
                 onClick={() => copyToClipboard(transaction.transactionId)}
                 className="text-muted-foreground hover:text-foreground p-0.5"
                 title="Copy ID"
+                aria-label="Copy transaction ID"
               >
                 {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
               </button>
@@ -171,24 +301,6 @@ export function TransactionDetailDialog({
               {transaction.direction} ({isCredit ? "CR" : "DR"})
             </span>
           </div>
-
-          {hasAccounts && sourceAccountId && destinationAccountId && (
-            <div className="py-2 flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Account Flow</span>
-              <div className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                <span className="truncate max-w-[120px]" title={sourceAccountId}>
-                  {sourceAccountId.slice(0, 8)}...
-                </span>
-                <ArrowRight className="size-3 shrink-0 text-muted-foreground/60" />
-                <span
-                  className="truncate max-w-[120px] text-foreground font-medium"
-                  title={destinationAccountId}
-                >
-                  {destinationAccountId.slice(0, 8)}...
-                </span>
-              </div>
-            </div>
-          )}
 
           {balanceAfter !== undefined && (
             <div className="py-2 flex items-center justify-between">

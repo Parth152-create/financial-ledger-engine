@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import {
   BookOpenText,
   Building2,
@@ -12,38 +14,86 @@ import {
   FilterX,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AmountDisplay } from "@/components/ui/amount-display"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { TransactionTypeBadge } from "@/components/ledger/transaction-type-badge"
 import { TransactionDetailDialog } from "@/components/transactions/transaction-detail-dialog"
+import { CreateAccountDialog } from "@/components/accounts/create-account-dialog"
 import { useAccounts } from "@/hooks/api/use-accounts"
 import { useAccountStatement } from "@/hooks/api/use-statements"
 import { useAccountTransactions } from "@/hooks/api/use-transactions"
 import { formatDate } from "@/lib/formatters/date"
+import { formatAccountFlowLabel, getLedgerErrorMessage, maskAccountNumber } from "@/lib/formatters/ledger"
+import { ROUTES } from "@/constants/routes"
 import type { StatementEntry, AccountStatementParams } from "@/types/statement"
 import type { TransactionHistoryItem, TransactionHistoryParams, TransactionType, TransactionStatus } from "@/types/transaction"
 import { cn } from "@/lib/utils"
 
-export default function LedgerPage() {
-  const { data: accounts, isLoading: isLoadingAccounts, isError: isErrorAccounts, error: accountsError, refetch: refetchAccounts } = useAccounts()
+type ViewMode = "transactions" | "journal"
+
+function LedgerContent() {
+  const searchParams = useSearchParams()
+  const paramAccountId = searchParams.get("accountId")
+
+  const {
+    data: accounts,
+    isLoading: isLoadingAccounts,
+    isError: isErrorAccounts,
+    error: accountsError,
+    refetch: refetchAccounts,
+  } = useAccounts()
+
+  // Filter strictly to user checking accounts
+  const checkingAccounts = React.useMemo(() => {
+    if (!accounts) return []
+    return accounts.filter((acc) => acc.accountType === "USER_CHECKING")
+  }, [accounts])
 
   const [selectedAccountId, setSelectedAccountId] = React.useState<string>("")
-  const [viewMode, setViewMode] = React.useState<"journal" | "transactions">("journal")
+  const [viewMode, setViewMode] = React.useState<ViewMode>("transactions")
   const [page, setPage] = React.useState(0)
   const pageSize = 20
 
+  const [isCreateAccountOpen, setIsCreateAccountOpen] = React.useState(false)
+
+  // Filters
   const [typeFilter, setTypeFilter] = React.useState<string>("")
   const [statusFilter, setStatusFilter] = React.useState<string>("")
   const [fromDate, setFromDate] = React.useState<string>("")
   const [toDate, setToDate] = React.useState<string>("")
   const [searchQuery, setSearchQuery] = React.useState<string>("")
 
+  // Selected transaction for detail dialog
   const [selectedItem, setSelectedItem] = React.useState<StatementEntry | TransactionHistoryItem | null>(null)
 
-  const activeAccountId = selectedAccountId || (accounts && accounts.length > 0 ? accounts[0].accountId : "")
-  const currentAccount = accounts?.find((a) => a.accountId === activeAccountId)
+  // Resolve active account ID: query parameter first, then selected, then first checking account
+  const activeAccountId = React.useMemo(() => {
+    if (paramAccountId && checkingAccounts.some((a) => a.accountId === paramAccountId)) {
+      return paramAccountId
+    }
+    if (selectedAccountId && checkingAccounts.some((a) => a.accountId === selectedAccountId)) {
+      return selectedAccountId
+    }
+    return checkingAccounts[0]?.accountId ?? ""
+  }, [paramAccountId, selectedAccountId, checkingAccounts])
+
+  const currentAccount = React.useMemo(() => {
+    return checkingAccounts.find((a) => a.accountId === activeAccountId)
+  }, [checkingAccounts, activeAccountId])
+
+  // Query parameter builders
+  const transactionParams: TransactionHistoryParams = React.useMemo(() => {
+    const params: TransactionHistoryParams = { page, size: pageSize }
+    if (typeFilter) params.transactionType = typeFilter as TransactionType
+    if (statusFilter) params.status = statusFilter as TransactionStatus
+    if (fromDate) params.from = `${fromDate}T00:00:00Z`
+    if (toDate) params.to = `${toDate}T23:59:59Z`
+    return params
+  }, [page, pageSize, typeFilter, statusFilter, fromDate, toDate])
 
   const statementParams: AccountStatementParams = React.useMemo(() => {
     const params: AccountStatementParams = { page, size: pageSize }
@@ -54,14 +104,17 @@ export default function LedgerPage() {
     return params
   }, [page, pageSize, typeFilter, statusFilter, fromDate, toDate])
 
-  const transactionParams: TransactionHistoryParams = React.useMemo(() => {
-    const params: TransactionHistoryParams = { page, size: pageSize }
-    if (typeFilter) params.transactionType = typeFilter as TransactionType
-    if (statusFilter) params.status = statusFilter as TransactionStatus
-    if (fromDate) params.from = `${fromDate}T00:00:00Z`
-    if (toDate) params.to = `${toDate}T23:59:59Z`
-    return params
-  }, [page, pageSize, typeFilter, statusFilter, fromDate, toDate])
+  // Queries
+  const {
+    data: txData,
+    isLoading: isLoadingTx,
+    isError: isErrorTx,
+    error: txError,
+    refetch: refetchTx,
+    isFetching: isFetchingTx,
+  } = useAccountTransactions(activeAccountId, transactionParams, {
+    enabled: Boolean(activeAccountId) && viewMode === "transactions",
+  })
 
   const {
     data: statementData,
@@ -70,18 +123,11 @@ export default function LedgerPage() {
     error: statementError,
     refetch: refetchStatement,
     isFetching: isFetchingStatement,
-  } = useAccountStatement(activeAccountId, statementParams, { enabled: Boolean(activeAccountId) && viewMode === "journal" })
+  } = useAccountStatement(activeAccountId, statementParams, {
+    enabled: Boolean(activeAccountId) && viewMode === "journal",
+  })
 
-  const {
-    data: txData,
-    isLoading: isLoadingTx,
-    isError: isErrorTx,
-    error: txError,
-    refetch: refetchTx,
-    isFetching: isFetchingTx,
-  } = useAccountTransactions(activeAccountId, transactionParams, { enabled: Boolean(activeAccountId) && viewMode === "transactions" })
-
-  const hasActiveFilters = Boolean(typeFilter || statusFilter || fromDate || toDate || searchQuery)
+  const hasActiveFilters = Boolean(typeFilter || statusFilter || fromDate || toDate || searchQuery.trim())
 
   const handleResetFilters = () => {
     setTypeFilter("")
@@ -97,51 +143,67 @@ export default function LedgerPage() {
     setPage(0)
   }
 
-  const handleViewModeChange = (mode: "journal" | "transactions") => {
+  const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode)
     setPage(0)
   }
 
-  const statementEntries = statementData?.entries ?? []
-  const filteredStatementEntries = searchQuery.trim()
-    ? statementEntries.filter(
-        (entry) =>
-          entry.transactionId.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-          (entry.description && entry.description.toLowerCase().includes(searchQuery.trim().toLowerCase())) ||
-          entry.transactionType.toLowerCase().includes(searchQuery.trim().toLowerCase())
-      )
-    : statementEntries
-
+  // Filter items matching client-side search query
   const txEntries = txData?.content ?? []
   const filteredTxEntries = searchQuery.trim()
-    ? txEntries.filter(
-        (tx) =>
-          tx.transactionId.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-          (tx.description && tx.description.toLowerCase().includes(searchQuery.trim().toLowerCase())) ||
-          tx.transactionType.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-          (tx.sourceAccountId && tx.sourceAccountId.toLowerCase().includes(searchQuery.trim().toLowerCase())) ||
-          (tx.destinationAccountId && tx.destinationAccountId.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-      )
+    ? txEntries.filter((tx) => {
+        const query = searchQuery.trim().toLowerCase()
+        return (
+          tx.transactionId.toLowerCase().includes(query) ||
+          (tx.description && tx.description.toLowerCase().includes(query)) ||
+          tx.transactionType.toLowerCase().includes(query)
+        )
+      })
     : txEntries
 
-  const isLoadingData = viewMode === "journal" ? isLoadingStatement : isLoadingTx
-  const isErrorData = viewMode === "journal" ? isErrorStatement : isErrorTx
-  const dataError = viewMode === "journal" ? statementError : txError
-  const isFetchingData = viewMode === "journal" ? isFetchingStatement : isFetchingTx
+  const statementEntries = statementData?.entries ?? []
+  const filteredStatementEntries = searchQuery.trim()
+    ? statementEntries.filter((entry) => {
+        const query = searchQuery.trim().toLowerCase()
+        return (
+          entry.transactionId.toLowerCase().includes(query) ||
+          (entry.description && entry.description.toLowerCase().includes(query)) ||
+          entry.transactionType.toLowerCase().includes(query)
+        )
+      })
+    : statementEntries
+
+  const isLoadingData = viewMode === "transactions" ? isLoadingTx : isLoadingStatement
+  const isErrorData = viewMode === "transactions" ? isErrorTx : isErrorStatement
+  const dataError = viewMode === "transactions" ? txError : statementError
+  const isFetchingData = viewMode === "transactions" ? isFetchingTx : isFetchingStatement
+
+  const activeTotalElements =
+    viewMode === "transactions" ? txData?.totalElements ?? 0 : statementData?.totalElements ?? 0
+  const activeTotalPages =
+    viewMode === "transactions" ? txData?.totalPages ?? 1 : statementData?.totalPages ?? 1
+  const isFirstPage =
+    viewMode === "transactions" ? txData?.first ?? page === 0 : statementData?.first ?? page === 0
+  const isLastPage =
+    viewMode === "transactions"
+      ? txData?.last ?? page >= activeTotalPages - 1
+      : statementData?.last ?? page >= activeTotalPages - 1
 
   return (
     <div className="space-y-6 select-none font-sans">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
         <div>
           <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
-            Ledger Journal
+            Ledger
           </h1>
           <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
-            Immutable double-entry journal entries and chronological transaction records.
+            Immutable financial transaction history and authoritative ledger activity.
           </p>
         </div>
 
-        {accounts && accounts.length > 0 && (
+        {/* Account Selector Dropdown */}
+        {checkingAccounts.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
               Account Instrument:
@@ -151,9 +213,9 @@ export default function LedgerPage() {
               onChange={handleAccountChange}
               className="h-8.5 rounded-xs border border-border bg-card px-2.5 text-xs text-foreground font-mono focus:outline-hidden focus:ring-1 focus:ring-ring"
             >
-              {accounts.map((acc) => (
+              {checkingAccounts.map((acc) => (
                 <option key={acc.accountId} value={acc.accountId}>
-                  {acc.accountNumber} ({acc.currency})
+                  Checking {maskAccountNumber(acc.accountNumber)} ({acc.currency})
                 </option>
               ))}
             </select>
@@ -161,6 +223,13 @@ export default function LedgerPage() {
         )}
       </div>
 
+      {/* Subtle Immutability Informational Indicator */}
+      <div className="flex items-center gap-2 p-2.5 rounded-sm border border-border/60 bg-muted/20 text-xs text-muted-foreground">
+        <ShieldCheck className="size-3.5 text-primary shrink-0" />
+        <span>Ledger entries are immutable. Corrections are recorded as compensating transactions.</span>
+      </div>
+
+      {/* Loading Accounts */}
       {isLoadingAccounts ? (
         <div className="rounded-sm border border-border bg-card p-6 animate-pulse space-y-3">
           <div className="h-4 w-48 bg-muted rounded-xs" />
@@ -170,18 +239,37 @@ export default function LedgerPage() {
         <div className="p-8 text-center space-y-2 bg-card border border-destructive/20 rounded-sm">
           <AlertCircle className="size-6 text-destructive mx-auto" />
           <p className="text-sm font-semibold text-foreground">Failed to load accounts</p>
-          <p className="text-xs text-muted-foreground">{accountsError?.message || "Error fetching account instruments."}</p>
+          <p className="text-xs text-muted-foreground">
+            {getLedgerErrorMessage(accountsError)}
+          </p>
           <Button variant="outline" size="xs" onClick={() => refetchAccounts()} className="mt-2">
             Retry
           </Button>
         </div>
-      ) : !accounts || accounts.length === 0 ? (
+      ) : checkingAccounts.length === 0 ? (
+        /* Zero Accounts Empty State */
         <div className="p-12 text-center space-y-3 bg-card border border-border/70 rounded-sm">
           <Building2 className="size-8 text-muted-foreground/40 mx-auto" />
           <p className="text-base font-semibold text-foreground">No Checking Accounts Found</p>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             You must have at least one active checking account to inspect ledger entries.
           </p>
+          <div className="pt-2 flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setIsCreateAccountOpen(true)}
+              className="gap-1.5"
+            >
+              <Plus className="size-3.5" />
+              <span>Create Account</span>
+            </Button>
+            <Link href={ROUTES.ACCOUNTS}>
+              <Button type="button" variant="outline" size="sm">
+                Manage Accounts
+              </Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -193,13 +281,13 @@ export default function LedgerPage() {
                   Account Reference
                 </span>
                 <div className="font-mono text-sm font-semibold text-foreground">
-                  {currentAccount.accountNumber}
+                  Checking {maskAccountNumber(currentAccount.accountNumber)}
                 </div>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Current Balance
+                  Available Balance
                 </span>
                 <div>
                   <AmountDisplay
@@ -221,16 +309,16 @@ export default function LedgerPage() {
 
               <div className="space-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Ledger Mode
+                  Accounting Engine
                 </span>
                 <div className="text-xs text-muted-foreground font-mono">
-                  DOUBLE_ENTRY_V1
+                  PostgreSQL ACID (v1)
                 </div>
               </div>
             </div>
           )}
 
-          {/* Statement Running Totals (if journal mode and available) */}
+          {/* Statement Running Totals (if in journal mode) */}
           {viewMode === "journal" && statementData && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-sm border border-border/60 bg-muted/20 text-xs">
               <div>
@@ -255,20 +343,8 @@ export default function LedgerPage() {
           {/* View Mode & Filter Controls */}
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* View Mode Switcher */}
               <div className="flex items-center gap-1.5 p-0.5 rounded-sm bg-muted/60 border border-border">
-                <button
-                  type="button"
-                  onClick={() => handleViewModeChange("journal")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-xs transition-colors",
-                    viewMode === "journal"
-                      ? "bg-card text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <ReceiptText className="size-3.5" />
-                  <span>Journal & Balance</span>
-                </button>
                 <button
                   type="button"
                   onClick={() => handleViewModeChange("transactions")}
@@ -280,10 +356,24 @@ export default function LedgerPage() {
                   )}
                 >
                   <History className="size-3.5" />
-                  <span>Transaction Journal</span>
+                  <span>Transaction Ledger</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("journal")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-xs transition-colors",
+                    viewMode === "journal"
+                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ReceiptText className="size-3.5" />
+                  <span>Statement & Balance</span>
                 </button>
               </div>
 
+              {/* Search Box */}
               <div className="flex items-center gap-1.5 flex-1 max-w-sm">
                 <input
                   type="text"
@@ -295,6 +385,7 @@ export default function LedgerPage() {
               </div>
             </div>
 
+            {/* Filter Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-sm border border-border/70 bg-card text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
@@ -375,247 +466,265 @@ export default function LedgerPage() {
                   <RotateCw className="size-3 animate-spin text-muted-foreground mr-1" />
                 )}
                 <span className="text-[11px]">
-                  {viewMode === "journal" && statementData
-                    ? `${statementData.totalElements} entries`
-                    : viewMode === "transactions" && txData
-                    ? `${txData.totalElements} transactions`
-                    : ""}
+                  {activeTotalElements} {viewMode === "journal" ? "entries" : "transactions"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Ledger Table */}
+          {/* Ledger Table Container */}
           <div className="border border-border/70 rounded-sm overflow-hidden bg-card">
-            <div className="grid grid-cols-12 gap-3 px-3.5 py-2.5 bg-muted/40 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/70">
-              <span className="col-span-2">Date & Time</span>
-              <span className="col-span-2">Type</span>
-              <span className="col-span-3">Description / Flow</span>
-              <span className="col-span-1 text-center">Flow</span>
-              <span className="col-span-2 text-right">Amount</span>
-              <span className="col-span-2 text-right">{viewMode === "journal" ? "Balance After" : "Status"}</span>
-            </div>
-
-            {isLoadingData ? (
-              <div className="divide-y divide-border/50">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-12 items-center gap-3 px-3.5 py-3 animate-pulse"
-                  >
-                    <div className="col-span-2 space-y-1">
-                      <div className="h-3 w-20 bg-muted rounded-xs" />
-                      <div className="h-2 w-14 bg-muted/60 rounded-xs" />
-                    </div>
-                    <div className="col-span-2">
-                      <div className="h-4 w-16 bg-muted rounded-xs" />
-                    </div>
-                    <div className="col-span-3">
-                      <div className="h-3 w-28 bg-muted rounded-xs" />
-                    </div>
-                    <div className="col-span-1 flex justify-center">
-                      <div className="h-4 w-7 bg-muted rounded-xs" />
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                      <div className="h-3 w-16 bg-muted rounded-xs" />
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                      <div className="h-4 w-18 bg-muted rounded-xs" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : isErrorData ? (
-              <div className="p-8 text-center space-y-2.5">
-                <AlertCircle className="size-6 text-destructive mx-auto" />
-                <p className="text-sm font-semibold text-foreground">
-                  Failed to load ledger records
-                </p>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {dataError?.message || "An error occurred while fetching ledger data."}
-                </p>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={() => (viewMode === "journal" ? refetchStatement() : refetchTx())}
-                  className="gap-1 mt-1 text-xs"
-                >
-                  <RotateCw className="size-3" />
-                  <span>Retry</span>
-                </Button>
-              </div>
-            ) : viewMode === "journal" ? (
-              filteredStatementEntries.length === 0 ? (
-                <div className="p-12 text-center space-y-3 bg-card">
-                  <BookOpenText className="size-8 text-muted-foreground/40 mx-auto" />
-                  <p className="text-sm font-medium text-foreground">
-                    {hasActiveFilters ? "No entries match your filters" : "No journal entries recorded"}
-                  </p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    {hasActiveFilters
-                      ? "Try adjusting search or filter parameters to locate entries."
-                      : "Transactions posted to this account will append double-entry records here."}
-                  </p>
-                  {hasActiveFilters && (
-                    <Button variant="outline" size="xs" onClick={handleResetFilters} className="mt-2 text-xs">
-                      Reset Filters
-                    </Button>
-                  )}
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-3 px-3.5 py-2.5 bg-muted/40 text-[11px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/70">
+                  <span className="col-span-2">Date & Time</span>
+                  <span className="col-span-2">Type</span>
+                  <span className="col-span-3">Counterparty / Description</span>
+                  <span className="col-span-1 text-center">Flow</span>
+                  <span className="col-span-2 text-right">Amount</span>
+                  <span className="col-span-2 text-right">
+                    {viewMode === "journal" ? "Balance After" : "Status"}
+                  </span>
                 </div>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  {filteredStatementEntries.map((entry) => {
-                    const isCredit = entry.direction === "CREDIT"
-                    return (
+
+                {/* Table Body */}
+                {isLoadingData ? (
+                  <div className="divide-y divide-border/50">
+                    {Array.from({ length: 6 }).map((_, i) => (
                       <div
-                        key={entry.transactionId}
-                        onClick={() => setSelectedItem(entry)}
-                        className="grid grid-cols-12 items-center gap-3 px-3.5 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none text-xs"
+                        key={i}
+                        className="grid grid-cols-12 items-center gap-3 px-3.5 py-3 animate-pulse"
                       >
-                        <div className="col-span-2 flex flex-col font-mono text-[11px] text-muted-foreground leading-tight">
-                          <span>{formatDate(entry.createdAt)}</span>
-                          <span className="text-[10px] text-muted-foreground/60 truncate" title={entry.transactionId}>
-                            {entry.transactionId.slice(0, 8)}
-                          </span>
+                        <div className="col-span-2 space-y-1">
+                          <div className="h-3 w-20 bg-muted rounded-xs" />
+                          <div className="h-2 w-14 bg-muted/60 rounded-xs" />
                         </div>
-
                         <div className="col-span-2">
-                          <TransactionTypeBadge type={entry.transactionType} />
+                          <div className="h-4 w-16 bg-muted rounded-xs" />
                         </div>
-
-                        <div className="col-span-3 text-muted-foreground truncate text-xs">
-                          {entry.description || "—"}
+                        <div className="col-span-3">
+                          <div className="h-3 w-28 bg-muted rounded-xs" />
                         </div>
-
-                        <div className="col-span-1 text-center">
-                          <span
-                            className={cn(
-                              "text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-sm border",
-                              isCredit
-                                ? "text-emerald-700 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
-                                : "text-foreground border-border bg-muted/40"
-                            )}
-                          >
-                            {isCredit ? "CR" : "DR"}
-                          </span>
+                        <div className="col-span-1 flex justify-center">
+                          <div className="h-4 w-7 bg-muted rounded-xs" />
                         </div>
-
-                        <div className="col-span-2 text-right">
-                          <AmountDisplay
-                            amount={entry.amount}
-                            currency={entry.currency}
-                            direction={isCredit ? "credit" : "debit"}
-                            size="sm"
-                            align="right"
-                            showSign
-                          />
+                        <div className="col-span-2 flex justify-end">
+                          <div className="h-3 w-16 bg-muted rounded-xs" />
                         </div>
-
-                        <div className="col-span-2 text-right font-mono text-xs text-foreground font-medium">
-                          <AmountDisplay
-                            amount={entry.balanceAfter}
-                            currency={entry.currency}
-                            size="sm"
-                            align="right"
-                          />
+                        <div className="col-span-2 flex justify-end">
+                          <div className="h-4 w-18 bg-muted rounded-xs" />
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              )
-            ) : filteredTxEntries.length === 0 ? (
-              <div className="p-12 text-center space-y-3 bg-card">
-                <Inbox className="size-8 text-muted-foreground/40 mx-auto" />
-                <p className="text-sm font-medium text-foreground">
-                  {hasActiveFilters ? "No transactions match your filters" : "No transactions recorded"}
-                </p>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {hasActiveFilters
-                    ? "Try adjusting search or filter parameters to locate transactions."
-                    : "Committed transactions affecting this checking instrument will appear here."}
-                </p>
-                {hasActiveFilters && (
-                  <Button variant="outline" size="xs" onClick={handleResetFilters} className="mt-2 text-xs">
-                    Reset Filters
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {filteredTxEntries.map((tx) => {
-                  const isCredit = tx.direction === "CREDIT"
-                  return (
-                    <div
-                      key={tx.transactionId}
-                      onClick={() => setSelectedItem(tx)}
-                      className="grid grid-cols-12 items-center gap-3 px-3.5 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none text-xs"
+                    ))}
+                  </div>
+                ) : isErrorData ? (
+                  <div className="p-8 text-center space-y-2.5">
+                    <AlertCircle className="size-6 text-destructive mx-auto" />
+                    <p className="text-sm font-semibold text-foreground">
+                      Failed to load ledger records
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      {getLedgerErrorMessage(dataError)}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => (viewMode === "journal" ? refetchStatement() : refetchTx())}
+                      className="gap-1 mt-1 text-xs"
                     >
-                      <div className="col-span-2 flex flex-col font-mono text-[11px] text-muted-foreground leading-tight">
-                        <span>{formatDate(tx.createdAt)}</span>
-                        <span className="text-[10px] text-muted-foreground/60 truncate" title={tx.transactionId}>
-                          {tx.transactionId.slice(0, 8)}
-                        </span>
-                      </div>
+                      <RotateCw className="size-3" />
+                      <span>Retry</span>
+                    </Button>
+                  </div>
+                ) : viewMode === "transactions" ? (
+                  filteredTxEntries.length === 0 ? (
+                    <div className="p-12 text-center space-y-3 bg-card">
+                      <Inbox className="size-8 text-muted-foreground/40 mx-auto" />
+                      <p className="text-sm font-medium text-foreground">
+                        {hasActiveFilters ? "No transactions match your filters" : "No transactions recorded"}
+                      </p>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        {hasActiveFilters
+                          ? "Try adjusting search or filter parameters to locate transactions."
+                          : "Committed transactions affecting this checking instrument will appear here."}
+                      </p>
+                      {hasActiveFilters && (
+                        <Button variant="outline" size="xs" onClick={handleResetFilters} className="mt-2 text-xs">
+                          Reset Filters
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {filteredTxEntries.map((tx) => {
+                        const isCredit = tx.direction === "CREDIT"
+                        const sourceLabel = formatAccountFlowLabel(tx.sourceAccountId, activeAccountId, checkingAccounts)
+                        const destLabel = formatAccountFlowLabel(tx.destinationAccountId, activeAccountId, checkingAccounts)
 
-                      <div className="col-span-2">
-                        <TransactionTypeBadge type={tx.transactionType} />
-                      </div>
+                        return (
+                          <div
+                            key={tx.transactionId}
+                            onClick={() => setSelectedItem(tx)}
+                            className="grid grid-cols-12 items-center gap-3 px-3.5 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none text-xs"
+                          >
+                            {/* Date & ID */}
+                            <div className="col-span-2 flex flex-col font-mono text-[11px] text-muted-foreground leading-tight">
+                              <span>{formatDate(tx.createdAt)}</span>
+                              <span className="text-[10px] text-muted-foreground/60 truncate" title={tx.transactionId}>
+                                {tx.transactionId.slice(0, 8)}
+                              </span>
+                            </div>
 
-                      <div className="col-span-3 text-muted-foreground truncate text-xs">
-                        {tx.description || (
-                          <span className="font-mono text-[11px]">
-                            {tx.sourceAccountId?.slice(0, 8)} → {tx.destinationAccountId?.slice(0, 8)}
-                          </span>
-                        )}
-                      </div>
+                            {/* Type */}
+                            <div className="col-span-2">
+                              <TransactionTypeBadge type={tx.transactionType} />
+                            </div>
 
-                      <div className="col-span-1 text-center">
-                        <span
-                          className={cn(
-                            "text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-sm border",
-                            isCredit
-                              ? "text-emerald-700 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
-                              : "text-foreground border-border bg-muted/40"
-                          )}
-                        >
-                          {isCredit ? "CR" : "DR"}
-                        </span>
-                      </div>
+                            {/* Counterparty Flow / Description */}
+                            <div className="col-span-3 text-muted-foreground truncate text-xs space-y-0.5">
+                              <div className="text-foreground font-medium truncate">
+                                {tx.transactionType === "DEPOSIT" ? (
+                                  <span>Platform Clearing → This Account</span>
+                                ) : tx.transactionType === "WITHDRAWAL" ? (
+                                  <span>This Account → Platform Clearing</span>
+                                ) : (
+                                  <span>{sourceLabel} → {destLabel}</span>
+                                )}
+                              </div>
+                              {tx.description && (
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {tx.description}
+                                </p>
+                              )}
+                            </div>
 
-                      <div className="col-span-2 text-right">
-                        <AmountDisplay
-                          amount={tx.amount}
-                          currency={tx.currency}
-                          direction={isCredit ? "credit" : "debit"}
-                          size="sm"
-                          align="right"
-                          showSign
-                        />
-                      </div>
+                            {/* Flow CR/DR */}
+                            <div className="col-span-1 text-center">
+                              <span
+                                className={cn(
+                                  "text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-sm border",
+                                  isCredit
+                                    ? "text-emerald-700 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                                    : "text-foreground border-border bg-muted/40"
+                                )}
+                              >
+                                {isCredit ? "CR" : "DR"}
+                              </span>
+                            </div>
 
-                      <div className="col-span-2 flex justify-end">
-                        <StatusBadge status={tx.status} />
-                      </div>
+                            {/* Amount */}
+                            <div className="col-span-2 text-right">
+                              <AmountDisplay
+                                amount={tx.amount}
+                                currency={tx.currency}
+                                direction={isCredit ? "credit" : "debit"}
+                                size="sm"
+                                align="right"
+                                showSign
+                              />
+                            </div>
+
+                            {/* Status */}
+                            <div className="col-span-2 flex justify-end">
+                              <StatusBadge status={tx.status} />
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   )
-                })}
+                ) : filteredStatementEntries.length === 0 ? (
+                  <div className="p-12 text-center space-y-3 bg-card">
+                    <BookOpenText className="size-8 text-muted-foreground/40 mx-auto" />
+                    <p className="text-sm font-medium text-foreground">
+                      {hasActiveFilters ? "No entries match your filters" : "No journal entries recorded"}
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      {hasActiveFilters
+                        ? "Try adjusting search or filter parameters to locate entries."
+                        : "Transactions posted to this account will append double-entry records here."}
+                    </p>
+                    {hasActiveFilters && (
+                      <Button variant="outline" size="xs" onClick={handleResetFilters} className="mt-2 text-xs">
+                        Reset Filters
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {filteredStatementEntries.map((entry) => {
+                      const isCredit = entry.direction === "CREDIT"
+                      return (
+                        <div
+                          key={entry.transactionId}
+                          onClick={() => setSelectedItem(entry)}
+                          className="grid grid-cols-12 items-center gap-3 px-3.5 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer select-none text-xs"
+                        >
+                          <div className="col-span-2 flex flex-col font-mono text-[11px] text-muted-foreground leading-tight">
+                            <span>{formatDate(entry.createdAt)}</span>
+                            <span className="text-[10px] text-muted-foreground/60 truncate" title={entry.transactionId}>
+                              {entry.transactionId.slice(0, 8)}
+                            </span>
+                          </div>
+
+                          <div className="col-span-2">
+                            <TransactionTypeBadge type={entry.transactionType} />
+                          </div>
+
+                          <div className="col-span-3 text-muted-foreground truncate text-xs">
+                            {entry.description || "—"}
+                          </div>
+
+                          <div className="col-span-1 text-center">
+                            <span
+                              className={cn(
+                                "text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-sm border",
+                                isCredit
+                                  ? "text-emerald-700 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                                  : "text-foreground border-border bg-muted/40"
+                              )}
+                            >
+                              {isCredit ? "CR" : "DR"}
+                            </span>
+                          </div>
+
+                          <div className="col-span-2 text-right">
+                            <AmountDisplay
+                              amount={entry.amount}
+                              currency={entry.currency}
+                              direction={isCredit ? "credit" : "debit"}
+                              size="sm"
+                              align="right"
+                              showSign
+                            />
+                          </div>
+
+                          <div className="col-span-2 text-right font-mono text-xs text-foreground font-medium">
+                            <AmountDisplay
+                              amount={entry.balanceAfter}
+                              currency={entry.currency}
+                              size="sm"
+                              align="right"
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Pagination Controls */}
-            {((viewMode === "journal" && statementData && statementData.totalPages > 1) ||
-              (viewMode === "transactions" && txData && txData.totalPages > 1)) && (
+            {activeTotalPages > 1 && (
               <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/20 border-t border-border/70 text-xs text-muted-foreground">
                 <div>
                   <span>
-                    Page{" "}
-                    <span className="font-medium text-foreground">
-                      {viewMode === "journal" ? (statementData ? statementData.page + 1 : 1) : txData ? txData.page + 1 : 1}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-medium text-foreground">
-                      {viewMode === "journal" ? statementData?.totalPages : txData?.totalPages}
+                    Page <span className="font-medium text-foreground">{page + 1}</span> of{" "}
+                    <span className="font-medium text-foreground">{activeTotalPages}</span>{" "}
+                    <span className="text-muted-foreground/70">
+                      ({activeTotalElements} total {viewMode === "journal" ? "entries" : "transactions"})
                     </span>
                   </span>
                 </div>
@@ -625,11 +734,7 @@ export default function LedgerPage() {
                     variant="outline"
                     size="xs"
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={
-                      page === 0 ||
-                      (viewMode === "journal" ? statementData?.first : txData?.first) ||
-                      isLoadingData
-                    }
+                    disabled={isFirstPage || isLoadingData}
                     className="gap-1 h-7 px-2"
                   >
                     <ChevronLeft className="size-3" />
@@ -639,11 +744,7 @@ export default function LedgerPage() {
                     variant="outline"
                     size="xs"
                     onClick={() => setPage((p) => p + 1)}
-                    disabled={
-                      (viewMode === "journal"
-                        ? statementData?.last || page >= (statementData?.totalPages ?? 1) - 1
-                        : txData?.last || page >= (txData?.totalPages ?? 1) - 1) || isLoadingData
-                    }
+                    disabled={isLastPage || isLoadingData}
                     className="gap-1 h-7 px-2"
                   >
                     <span>Next</span>
@@ -656,13 +757,39 @@ export default function LedgerPage() {
         </div>
       )}
 
+      {/* Transaction Details Dialog with Double-Entry Flow */}
       <TransactionDetailDialog
         open={Boolean(selectedItem)}
         onOpenChange={(open) => {
           if (!open) setSelectedItem(null)
         }}
         transaction={selectedItem}
+        currentAccountId={activeAccountId}
+        accounts={checkingAccounts}
+      />
+
+      {/* Create Account Dialog for empty state */}
+      <CreateAccountDialog
+        open={isCreateAccountOpen}
+        onOpenChange={setIsCreateAccountOpen}
+        onSuccess={() => {
+          refetchAccounts()
+        }}
       />
     </div>
+  )
+}
+
+export default function LedgerPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="py-12 text-center text-sm text-muted-foreground font-sans">
+          Loading ledger console...
+        </div>
+      }
+    >
+      <LedgerContent />
+    </React.Suspense>
   )
 }
