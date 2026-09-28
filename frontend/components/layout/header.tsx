@@ -40,11 +40,6 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xs border border-border/80 bg-muted/40 text-[11.5px] font-mono text-muted-foreground select-none">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          <span>INR LEDGER</span>
-        </div>
-
         <ThemeToggle />
 
         {user && (

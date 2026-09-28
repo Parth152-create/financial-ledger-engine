@@ -4,7 +4,6 @@ import * as React from "react"
 import { RotateCw, AlertCircle } from "lucide-react"
 import { Section } from "@/components/ui/section"
 import { Button } from "@/components/ui/button"
-import { DataRow } from "@/components/ui/data-row"
 import { ReconciliationSummary } from "@/components/reconciliation/reconciliation-summary"
 import { ReconciliationTable } from "@/components/reconciliation/reconciliation-table"
 import { useReconciliation } from "@/hooks/api/use-reconciliation"
@@ -35,13 +34,13 @@ function ReconciliationContent() {
 
   return (
     <div className="space-y-6 select-none font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground font-sans">
             Reconciliation
           </h1>
-          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
-            Verify balance integrity between cached account snapshots and the sum of immutable ledger entries.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Verify balance integrity between account balances and ledger entries.
           </p>
         </div>
 
@@ -50,7 +49,7 @@ function ReconciliationContent() {
             size="sm"
             onClick={handleRunReconciliation}
             disabled={isFetching}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-xs font-medium h-8 px-3"
           >
             <RotateCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             <span>{isFetching ? "Reconciling..." : "Run Reconciliation"}</span>
@@ -115,24 +114,6 @@ function ReconciliationContent() {
           </Section>
         </div>
       ) : null}
-
-      <Section
-        title="Reconciliation Protocol"
-        description="Core accounting rules and integrity principles governing the ledger audit."
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1">
-            <DataRow label="Reconciliation Invariant" value="Snapshot Balance == Sum(Journal Credits − Debits)" />
-            <DataRow label="Reconciliation Endpoint" value="GET /api/v1/reconciliation" />
-            <DataRow label="Audit Scope" value="Authenticated user checking accounts" />
-          </div>
-          <div className="space-y-1">
-            <DataRow label="Discrepancy Remediation" value="Zero automated mutation (Read-only audit)" />
-            <DataRow label="Rounding Tolerance" value="0.0000 (Zero floating-point tolerance)" />
-            <DataRow label="Data Authority" value="Immutable append-only ledger entries" />
-          </div>
-        </div>
-      </Section>
     </div>
   )
 }

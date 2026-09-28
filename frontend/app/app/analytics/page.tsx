@@ -202,12 +202,12 @@ function AnalyticsContent() {
   return (
     <div className="space-y-6 select-none font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground font-sans">
             Analytics
           </h1>
-          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             Financial activity and account trends
           </p>
         </div>

@@ -16,7 +16,6 @@ export function useAuth() {
     queryKey: AUTH_QUERY_KEY,
     queryFn: () => authApi.getCurrentUser(),
     staleTime: 5 * 60 * 1000,
-    retry: false,
   })
 
   const loginWithGoogle = () => {
@@ -26,7 +25,6 @@ export function useAuth() {
   const loginWithEmail = async (email: string, password: string): Promise<User> => {
     const authenticatedUser = await authApi.login({ email, password })
     queryClient.setQueryData(AUTH_QUERY_KEY, authenticatedUser)
-    await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
     router.push(ROUTES.DASHBOARD)
     return authenticatedUser
   }
@@ -34,7 +32,6 @@ export function useAuth() {
   const signupWithEmail = async (name: string, email: string, password: string): Promise<User> => {
     const createdUser = await authApi.signup({ name, email, password })
     queryClient.setQueryData(AUTH_QUERY_KEY, createdUser)
-    await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
     router.push(ROUTES.DASHBOARD)
     return createdUser
   }
@@ -46,7 +43,7 @@ export function useAuth() {
       // Ignore network errors on logout
     } finally {
       queryClient.setQueryData(AUTH_QUERY_KEY, null)
-      queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
+      queryClient.removeQueries({ queryKey: AUTH_QUERY_KEY })
       router.push(ROUTES.LOGIN)
     }
   }

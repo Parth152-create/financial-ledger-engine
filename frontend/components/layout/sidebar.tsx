@@ -83,11 +83,13 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex items-center justify-between px-2 py-1.5 text-xs">
           <div className="min-w-0 pr-2">
             <p className="text-[13px] font-medium text-foreground truncate">
-              {user?.name || "Operator Session"}
+              {user?.name || "Account"}
             </p>
-            <p className="text-xs text-muted-foreground truncate font-mono">
-              {user?.email || "session@ledger"}
-            </p>
+            {user?.email && (
+              <p className="text-xs text-muted-foreground truncate font-mono">
+                {user.email}
+              </p>
+            )}
           </div>
           {user && (
             <button

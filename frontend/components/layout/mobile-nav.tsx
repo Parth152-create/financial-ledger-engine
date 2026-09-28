@@ -112,11 +112,13 @@ export function MobileNav({
           <div className="flex items-center justify-between text-xs px-2 py-1">
             <div className="min-w-0 pr-2">
               <p className="text-xs font-medium text-foreground truncate">
-                {user?.name || "Operator Session"}
+                {user?.name || "Account"}
               </p>
-              <p className="text-[11px] text-muted-foreground font-mono truncate">
-                {user?.email || "session@ledger"}
-              </p>
+              {user?.email && (
+                <p className="text-[11px] text-muted-foreground font-mono truncate">
+                  {user.email}
+                </p>
+              )}
             </div>
             {user && (
               <button

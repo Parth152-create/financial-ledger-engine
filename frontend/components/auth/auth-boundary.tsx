@@ -8,15 +8,15 @@ import { ROUTES } from "@/constants/routes"
 
 export function AuthBoundary({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { user, isLoading, error } = useAuth()
+  const { user, isLoading } = useAuth()
 
   React.useEffect(() => {
-    if (!isLoading && (!user || error)) {
+    if (!isLoading && !user) {
       router.replace(ROUTES.LOGIN)
     }
-  }, [isLoading, user, error, router])
+  }, [isLoading, user, router])
 
-  if (isLoading || !user || error) {
+  if (isLoading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background select-none">
         <div className="flex flex-col items-center gap-2.5">
@@ -24,7 +24,7 @@ export function AuthBoundary({ children }: { children: React.ReactNode }) {
             FL
           </div>
           <span className="text-xs text-muted-foreground font-sans">
-            {isLoading ? "Verifying operator session..." : "Redirecting to sign in..."}
+            {isLoading ? "Verifying session..." : "Redirecting to sign in..."}
           </span>
         </div>
       </div>

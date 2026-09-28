@@ -192,13 +192,13 @@ function LedgerContent() {
   return (
     <div className="space-y-6 select-none font-sans">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground font-sans">
             Ledger
           </h1>
-          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
-            Immutable financial transaction history and authoritative ledger activity.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Authoritative financial transaction history and statements.
           </p>
         </div>
 
@@ -309,10 +309,11 @@ function LedgerContent() {
 
               <div className="space-y-1">
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Accounting Engine
+                  Integrity
                 </span>
-                <div className="text-xs text-muted-foreground font-mono">
-                  PostgreSQL ACID (v1)
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                  <ShieldCheck className="size-3" />
+                  <span>Verified</span>
                 </div>
               </div>
             </div>
@@ -785,7 +786,7 @@ export default function LedgerPage() {
     <React.Suspense
       fallback={
         <div className="py-12 text-center text-sm text-muted-foreground font-sans">
-          Loading ledger console...
+          Loading ledger...
         </div>
       }
     >

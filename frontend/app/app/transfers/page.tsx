@@ -32,8 +32,8 @@ function TransfersContent() {
 
   const tabDescriptions: Record<TabType, string> = {
     transfer: "Move funds between your accounts.",
-    deposit: "Fund checking accounts with atomic double-entry deposits from platform clearing.",
-    withdrawal: "Withdraw funds from checking accounts to platform clearing atomically.",
+    deposit: "Add funds to your checking accounts.",
+    withdrawal: "Withdraw funds from your checking accounts.",
   }
 
   return (
@@ -106,7 +106,7 @@ export default function TransfersPage() {
     <React.Suspense
       fallback={
         <div className="py-12 text-center text-sm text-muted-foreground font-sans">
-          Loading operations console...
+          Loading...
         </div>
       }
     >

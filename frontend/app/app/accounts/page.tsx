@@ -3,13 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { Landmark, Plus, Filter, AlertCircle, RotateCw, Search } from "lucide-react"
-import { Section } from "@/components/ui/section"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { AmountDisplay } from "@/components/ui/amount-display"
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog"
 import { useAccounts } from "@/hooks/api/use-accounts"
+import { maskAccountNumber } from "@/lib/formatters/ledger"
 import { ROUTES } from "@/constants/routes"
 import type { AccountStatus } from "@/types/account"
 
@@ -40,14 +40,14 @@ export default function AccountsPage() {
   }, [accounts, searchTerm, statusFilter])
 
   return (
-    <div className="space-y-6 select-none font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
+    <div className="space-y-6 select-none font-sans max-w-5xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground font-sans">
             Accounts
           </h1>
-          <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
-            Manage checking accounts, review lifecycle states, and create new financial instruments.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Your checking accounts and balances.
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export default function AccountsPage() {
           <Button
             size="sm"
             onClick={() => setIsCreateOpen(true)}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-xs font-medium h-8 px-3"
           >
             <Plus className="size-3.5" />
             <span>Create Account</span>
@@ -68,9 +68,8 @@ export default function AccountsPage() {
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search accounts by ID or number..."
-            className="h-8.5 text-[13.5px] font-mono"
-            monospace
+            placeholder="Search accounts..."
+            className="h-8 text-xs font-sans"
           />
         </div>
         <div className="relative flex items-center gap-2">
@@ -78,16 +77,16 @@ export default function AccountsPage() {
             variant={statusFilter === "ALL" ? "outline" : "secondary"}
             size="sm"
             onClick={() => setIsFilterOpen((prev) => !prev)}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-xs h-8 px-2.5"
           >
-            <Filter className="size-3.5" />
+            <Filter className="size-3" />
             <span>
-              {statusFilter === "ALL" ? "Filter Status" : `Status: ${statusFilter}`}
+              {statusFilter === "ALL" ? "Filter" : `Status: ${statusFilter}`}
             </span>
           </Button>
 
           {isFilterOpen && (
-            <div className="absolute right-0 top-9.5 z-20 w-36 rounded-sm border border-border bg-card p-1 shadow-md text-[13px] font-sans space-y-0.5">
+            <div className="absolute right-0 top-9 z-20 w-36 rounded-sm border border-border bg-card p-1 shadow-md text-xs font-sans space-y-0.5">
               {(["ALL", "ACTIVE", "FROZEN", "CLOSED"] as const).map((status) => (
                 <button
                   key={status}
@@ -96,7 +95,7 @@ export default function AccountsPage() {
                     setStatusFilter(status)
                     setIsFilterOpen(false)
                   }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xs transition-colors text-[13px] ${
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xs transition-colors text-xs ${
                     statusFilter === status
                       ? "bg-primary text-primary-foreground font-medium"
                       : "text-foreground hover:bg-muted"
@@ -110,156 +109,137 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <Section
-        title="Checking Accounts"
-        description="All user-owned checking accounts provisioned in the ledger."
-      >
-        <div className="border border-border/70 rounded-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <div className="min-w-[640px]">
-              <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/30 text-[13px] text-muted-foreground font-medium border-b border-border/70">
-                <span className="col-span-4">Account ID & Number</span>
-                <span className="col-span-2">Type</span>
-                <span className="col-span-2">Currency</span>
-                <span className="col-span-2">Status</span>
-                <span className="col-span-2 text-right">Available Balance</span>
+      <div className="rounded-sm border border-border/70 bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/20 text-xs font-medium text-muted-foreground border-b border-border/60">
+              <span className="col-span-5">Account</span>
+              <span className="col-span-2">Currency</span>
+              <span className="col-span-2">Status</span>
+              <span className="col-span-3 text-right">Available Balance</span>
+            </div>
+
+            {isLoading ? (
+              <div className="divide-y divide-border/50">
+                {[1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 gap-3 px-4 py-3 items-center animate-pulse"
+                  >
+                    <div className="col-span-5 space-y-1">
+                      <div className="h-3.5 w-32 bg-muted rounded-xs" />
+                      <div className="h-2.5 w-20 bg-muted/60 rounded-xs" />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="h-3 w-8 bg-muted rounded-xs" />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="h-4 w-14 bg-muted rounded-xs" />
+                    </div>
+                    <div className="col-span-3 flex justify-end">
+                      <div className="h-4 w-20 bg-muted rounded-xs" />
+                    </div>
+                  </div>
+                ))}
               </div>
-
-          {isLoading ? (
-            <div className="divide-y divide-border/50 bg-card">
-              {[1, 2, 3].map((idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-12 gap-3 px-4 py-3 items-center animate-pulse"
+            ) : isError ? (
+              <div className="p-8 text-center space-y-3">
+                <AlertCircle className="size-6 text-destructive mx-auto" />
+                <p className="text-sm font-semibold text-foreground">
+                  Failed to load accounts
+                </p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  {error?.message || "An error occurred while fetching accounts from the ledger."}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetch()}
+                  className="gap-1.5 text-xs h-7"
                 >
-                  <div className="col-span-4 space-y-1.5">
-                    <div className="h-3 w-32 bg-muted rounded-xs" />
-                    <div className="h-2.5 w-48 bg-muted/60 rounded-xs" />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="h-3 w-16 bg-muted rounded-xs" />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="h-4 w-10 bg-muted rounded-xs" />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="h-4 w-14 bg-muted rounded-xs" />
-                  </div>
-                  <div className="col-span-2 flex justify-end">
-                    <div className="h-3 w-20 bg-muted rounded-xs" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="p-8 text-center space-y-3 bg-card">
-              <AlertCircle className="size-8 text-destructive mx-auto" />
-              <p className="text-[15px] font-semibold text-foreground">
-                Failed to load accounts
-              </p>
-              <p className="text-[13.5px] text-muted-foreground max-w-sm mx-auto">
-                {error?.message || "An error occurred while fetching accounts from the ledger."}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                className="gap-1.5"
-              >
-                <RotateCw className="size-3.5" />
-                <span>Retry</span>
-              </Button>
-            </div>
-          ) : !accounts || accounts.length === 0 ? (
-            <div className="p-12 text-center space-y-3 bg-card">
-              <Landmark className="size-8 text-muted-foreground/40 mx-auto" />
-              <p className="text-[15px] font-medium text-foreground">
-                No accounts created yet
-              </p>
-              <p className="text-[13.5px] text-muted-foreground max-w-sm mx-auto">
-                Create a checking account to initiate transfers, deposit funds, and view statements.
-              </p>
-              <Button
-                size="sm"
-                onClick={() => setIsCreateOpen(true)}
-                className="gap-1.5 mt-2"
-              >
-                <Plus className="size-3.5" />
-                <span>Create First Account</span>
-              </Button>
-            </div>
-          ) : filteredAccounts.length === 0 ? (
-            <div className="p-10 text-center space-y-2 bg-card">
-              <Search className="size-6 text-muted-foreground/40 mx-auto" />
-              <p className="text-[15px] font-medium text-foreground">
-                No matching accounts found
-              </p>
-              <p className="text-[13.5px] text-muted-foreground max-w-xs mx-auto">
-                No accounts match your current filter or search criteria.
-              </p>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => {
-                  setSearchTerm("")
-                  setStatusFilter("ALL")
-                }}
-                className="mt-1"
-              >
-                Clear Filters
-              </Button>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/60 bg-card">
-              {filteredAccounts.map((account) => (
-                <Link
-                  key={account.accountId}
-                  href={ROUTES.ACCOUNT_DETAILS(account.accountId)}
-                  className="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-muted/40 transition-colors text-foreground group"
+                  <RotateCw className="size-3" />
+                  <span>Retry</span>
+                </Button>
+              </div>
+            ) : !accounts || accounts.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <Landmark className="size-8 text-muted-foreground/40 mx-auto" />
+                <p className="text-sm font-medium text-foreground">
+                  No accounts created yet
+                </p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Create a checking account to initiate transfers, deposit funds, and view statements.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="gap-1.5 mt-2 text-xs"
                 >
-                  <div className="col-span-4 min-w-0">
-                    <span className="font-mono text-[15px] font-semibold block tracking-tight group-hover:text-primary transition-colors truncate">
-                      {account.accountNumber}
-                    </span>
-                    <span
-                      className="font-mono text-[12.5px] text-muted-foreground truncate block mt-0.5"
-                      title={account.accountId}
-                    >
-                      {account.accountId}
-                    </span>
-                  </div>
+                  <Plus className="size-3.5" />
+                  <span>Create First Account</span>
+                </Button>
+              </div>
+            ) : filteredAccounts.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <Search className="size-6 text-muted-foreground/40 mx-auto" />
+                <p className="text-sm font-medium text-foreground">
+                  No matching accounts found
+                </p>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  No accounts match your current search or filter.
+                </p>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    setSearchTerm("")
+                    setStatusFilter("ALL")
+                  }}
+                  className="mt-1 text-xs"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {filteredAccounts.map((account) => (
+                  <Link
+                    key={account.accountId}
+                    href={ROUTES.ACCOUNT_DETAILS(account.accountId)}
+                    className="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-muted/20 transition-colors text-foreground group"
+                  >
+                    <div className="col-span-5 min-w-0">
+                      <span className="text-sm font-medium block text-foreground group-hover:text-primary transition-colors truncate">
+                        Checking Account
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground truncate block">
+                        {maskAccountNumber(account.accountNumber)}
+                      </span>
+                    </div>
 
-                  <div className="col-span-2 text-[14px] text-muted-foreground font-sans truncate">
-                    {account.accountType === "USER_CHECKING"
-                      ? "Checking"
-                      : account.accountType}
-                  </div>
-
-                  <div className="col-span-2">
-                    <span className="text-xs font-mono uppercase px-2 py-0.5 rounded-sm border border-border/80 bg-muted/40 text-muted-foreground">
+                    <div className="col-span-2 text-xs font-mono text-muted-foreground">
                       {account.currency}
-                    </span>
-                  </div>
+                    </div>
 
-                  <div className="col-span-2">
-                    <StatusBadge status={account.status} />
-                  </div>
+                    <div className="col-span-2">
+                      <StatusBadge status={account.status} />
+                    </div>
 
-                  <div className="col-span-2 text-right">
-                    <AmountDisplay
-                      amount={account.balance}
-                      currency={account.currency}
-                      align="right"
-                    />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-            </div>
+                    <div className="col-span-3 text-right">
+                      <AmountDisplay
+                        amount={account.balance}
+                        currency={account.currency}
+                        align="right"
+                        size="default"
+                      />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </Section>
+      </div>
 
       <CreateAccountDialog
         open={isCreateOpen}

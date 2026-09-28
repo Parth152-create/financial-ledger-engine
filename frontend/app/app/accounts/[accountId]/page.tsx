@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { AccountHeader } from "@/components/accounts/account-header"
 import { AccountMeta } from "@/components/accounts/account-meta"
-import { Section } from "@/components/ui/section"
 import { Button } from "@/components/ui/button"
 import { AccountTransactionHistory } from "@/components/transactions/account-transaction-history"
 import { AccountStatementView } from "@/components/statement/account-statement-view"
@@ -234,25 +233,19 @@ export default function AccountDetailPage() {
           </div>
 
           {activeTab === "transactions" ? (
-            <Section
-              title="Account Transaction History"
-              description="All debit and credit movements affecting this account."
-            >
+            <div className="rounded-sm border border-border/70 bg-card overflow-hidden">
               <AccountTransactionHistory
                 accountId={account.accountId}
                 currency={account.currency}
               />
-            </Section>
+            </div>
           ) : (
-            <Section
-              title="Account Statement"
-              description="Chronological record of transactions with opening, closing, and running balances."
-            >
+            <div className="rounded-sm border border-border/70 bg-card overflow-hidden">
               <AccountStatementView
                 accountId={account.accountId}
                 currency={account.currency}
               />
-            </Section>
+            </div>
           )}
         </div>
       </div>
