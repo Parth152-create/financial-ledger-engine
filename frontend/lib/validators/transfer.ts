@@ -21,6 +21,60 @@ export interface TransferValidationResult {
   }
 }
 
+/**
+ * Mask account number for recognition without exposing internal identifiers or full numbers.
+ * Example: ACCT-111122223333 -> •••• 3333
+ */
+export function maskAccountNumber(accountNumber?: string | null): string {
+  if (!accountNumber) return "•••• ----"
+  const clean = accountNumber.trim()
+  if (clean.length <= 4) return `•••• ${clean}`
+  return `•••• ${clean.slice(-4)}`
+}
+
+/**
+ * Parses a decimal string into a scaled BigInt to avoid JavaScript floating-point inaccuracies.
+ * Supports up to `scale` fraction digits (default 4 matching backend NUMERIC(19,4)).
+ */
+export function parseDecimalToScaledBigInt(value: string, scale = 4): bigint | null {
+  const trimmed = value.trim()
+  if (!/^\d+(\.\d{1,4})?$/.test(trimmed)) {
+    return null
+  }
+  const [wholePart, fracPart = ""] = trimmed.split(".")
+  const paddedFrac = fracPart.padEnd(scale, "0")
+  try {
+    return BigInt(wholePart + paddedFrac)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Calculates estimated source balance after transfer using decimal-safe BigInt arithmetic.
+ */
+export function calculateEstimatedBalanceAfter(
+  currentBalance: number | string,
+  amount: string
+): { formatted: string; isNegative: boolean; balanceStr: string } | null {
+  const balanceStr = typeof currentBalance === "number" ? currentBalance.toFixed(4) : currentBalance
+  const balanceBigInt = parseDecimalToScaledBigInt(balanceStr, 4)
+  const amountBigInt = parseDecimalToScaledBigInt(amount, 4)
+  if (balanceBigInt === null || amountBigInt === null) return null
+
+  const diff = balanceBigInt - amountBigInt
+  const isNegative = diff < BigInt(0)
+  const absDiff = isNegative ? -diff : diff
+  const whole = absDiff / BigInt(10000)
+  const frac = (absDiff % BigInt(10000)).toString().padStart(4, "0").slice(0, 2)
+  const formatted = `${isNegative ? "-" : ""}₹${whole.toLocaleString("en-IN")}.${frac}`
+  return {
+    formatted,
+    isNegative,
+    balanceStr: `${isNegative ? "-" : ""}${whole}.${frac}`,
+  }
+}
+
 export function validateTransferForm(
   values: TransferFormValues,
   sourceAccount?: Account | null,
@@ -49,25 +103,29 @@ export function validateTransferForm(
     errors.destinationAccountId = "Source and destination accounts must be different."
   }
 
-  // 4. Amount Validation
+  // 4. Amount Validation (Decimal-safe string & BigInt check)
   const rawAmount = (values.amount || "").trim()
   if (!rawAmount) {
     errors.amount = "Transfer amount is required."
   } else if (!/^\d+(\.\d{1,4})?$/.test(rawAmount)) {
     errors.amount = "Please enter a valid numeric amount (maximum 4 decimal places)."
   } else {
-    const numAmount = Number(rawAmount)
-    if (isNaN(numAmount) || numAmount <= 0) {
+    const amountBigInt = parseDecimalToScaledBigInt(rawAmount, 4)
+    if (amountBigInt === null || amountBigInt <= BigInt(0)) {
       errors.amount = "Transfer amount must be greater than zero."
-    } else if (numAmount >= 1e15) {
+    } else if (amountBigInt >= BigInt("10000000000000000000")) {
+      // 15 integer digits + 4 fraction digits = 1e19 limit
       errors.amount = "Transfer amount exceeds maximum supported limit."
-    } else if (sourceAccount && typeof sourceAccount.balance === "number" && numAmount > sourceAccount.balance) {
-      errors.amount = `Transfer amount exceeds available balance (${sourceAccount.currency} ${sourceAccount.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
+    } else if (sourceAccount && typeof sourceAccount.balance === "number") {
+      const sourceBalanceBigInt = parseDecimalToScaledBigInt(sourceAccount.balance.toFixed(4), 4)
+      if (sourceBalanceBigInt !== null && amountBigInt > sourceBalanceBigInt) {
+        errors.amount = `Transfer amount exceeds available balance (${sourceAccount.currency} ${sourceAccount.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`
+      }
     }
   }
 
   // 5. Currency Consistency
-  const cleanCurrency = (values.currency || "").trim().toUpperCase()
+  const cleanCurrency = (values.currency || "INR").trim().toUpperCase()
   if (!cleanCurrency) {
     errors.currency = "Currency is required."
   } else if (!/^[A-Z]{3}$/.test(cleanCurrency)) {
@@ -80,7 +138,7 @@ export function validateTransferForm(
     errors.currency = `Currency mismatch: source account is ${sourceAccount.currency} but destination account is ${destinationAccount.currency}. Transfers require matching currencies.`
   }
 
-  // 6. Description Limit
+  // 6. Description Limit (Backend max 255 chars)
   if (values.description && values.description.length > 255) {
     errors.description = "Description cannot exceed 255 characters."
   }
@@ -107,7 +165,9 @@ export function getTransferErrorMessage(error: unknown): string {
       rawMessage.includes("com.parth") ||
       rawMessage.includes("SQL") ||
       rawMessage.includes("StackTrace") ||
-      rawMessage.includes("Hibernate")
+      rawMessage.includes("Hibernate") ||
+      rawMessage.includes("Redis") ||
+      rawMessage.includes("postgres")
 
     if (status === 401) {
       return "Your session has expired. Please sign in again to continue."
@@ -150,16 +210,23 @@ export function getTransferErrorMessage(error: unknown): string {
       if (lower.includes("must be different") || lower.includes("same account")) {
         return "Source and destination accounts must be different."
       }
-      if (lower.includes("currency mismatch")) {
+      if (lower.includes("user_checking") || lower.includes("ineligible type") || lower.includes("account type")) {
+        return "Transfers are only permitted between standard checking accounts."
+      }
+      if (lower.includes("currency mismatch") || lower.includes("only inr")) {
         return "Transfer failed due to currency mismatch between source and destination accounts."
       }
       if (lower.includes("amount")) {
         return "Transfer amount must be greater than zero."
       }
-      if (lower.includes("idempotency-key")) {
+      if (lower.includes("idempotency-key") || lower.includes("idempotency key")) {
         return "Transfer request is missing a valid idempotency identifier."
       }
       return "Invalid transfer request parameters. Please verify the entered details."
+    }
+
+    if (status === 429) {
+      return "Too many requests. Please wait a moment before trying again."
     }
 
     if (status === 0 || apiErr.error === "NetworkError" || rawMessage.toLowerCase().includes("network")) {
@@ -182,4 +249,26 @@ export function getTransferErrorMessage(error: unknown): string {
   }
 
   return "An unexpected error occurred while processing the transfer. Please try again."
+}
+
+/**
+ * Determines whether an error is transient (network failure, rate limit, server error),
+ * indicating that a retry with the identical idempotency key is safe and appropriate.
+ */
+export function isTransientError(error: unknown): boolean {
+  if (!error) return false
+  if (error instanceof ApiError || (typeof error === "object" && error !== null && "status" in error)) {
+    const apiErr = error as ApiError
+    const status = apiErr.status
+    if (status === 0 || apiErr.error === "NetworkError") return true
+    if (status === 429) return true
+    if (status >= 500) return true
+  }
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase()
+    if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout")) {
+      return true
+    }
+  }
+  return false
 }

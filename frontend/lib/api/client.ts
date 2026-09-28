@@ -74,6 +74,13 @@ async function handleResponse<T>(response: Response, path: string): Promise<T> {
         path,
       }
     }
+    const retryAfterHeader = response.headers.get("retry-after")
+    if (retryAfterHeader) {
+      const parsed = parseInt(retryAfterHeader, 10)
+      if (!isNaN(parsed)) {
+        errorData.retryAfter = parsed
+      }
+    }
     throw new ApiError(errorData)
   }
 

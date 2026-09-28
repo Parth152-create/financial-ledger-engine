@@ -24,8 +24,14 @@ function TransfersContent() {
     router.replace(`/app/transfers?${newParams.toString()}`)
   }
 
+  const tabTitles: Record<TabType, string> = {
+    transfer: "Transfers",
+    deposit: "Deposits",
+    withdrawal: "Withdrawals",
+  }
+
   const tabDescriptions: Record<TabType, string> = {
-    transfer: "Execute atomic double-entry fund transfers between user accounts.",
+    transfer: "Move funds between your accounts.",
     deposit: "Fund checking accounts with atomic double-entry deposits from platform clearing.",
     withdrawal: "Withdraw funds from checking accounts to platform clearing atomically.",
   }
@@ -35,7 +41,7 @@ function TransfersContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
         <div>
           <h1 className="text-[26px] font-semibold tracking-tight text-foreground font-sans leading-tight">
-            Transfers & Transactions
+            {tabTitles[activeTab]}
           </h1>
           <p className="text-[14px] text-muted-foreground font-sans mt-0.5">
             {tabDescriptions[activeTab]}
