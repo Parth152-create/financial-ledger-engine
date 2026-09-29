@@ -32,6 +32,16 @@ public class AuthenticatedUserService {
      */
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return getUserFromAuthentication(authentication);
+    }
+
+    /**
+     * Resolves an application User entity from an Authentication instance.
+     *
+     * @param authentication The Spring Security Authentication instance.
+     * @return The resolved User entity.
+     */
+    public User getUserFromAuthentication(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
             throw new AuthenticationCredentialsNotFoundException("No authenticated user present in SecurityContext");
         }

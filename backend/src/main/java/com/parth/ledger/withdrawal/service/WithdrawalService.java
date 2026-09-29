@@ -53,17 +53,20 @@ public class WithdrawalService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public WithdrawalService(AccountRepository accountRepository,
                              TransactionRepository transactionRepository,
                              LedgerEntryRepository ledgerEntryRepository,
                              IdempotencyCacheService idempotencyCacheService,
-                             AuthenticatedUserService authenticatedUserService) {
+                             AuthenticatedUserService authenticatedUserService,
+                             com.parth.ledger.audit.AuditEventService auditEventService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
     }
 
     @Transactional
@@ -266,6 +269,19 @@ public class WithdrawalService {
         transaction.setStatus(TransactionStatus.COMPLETED);
         transaction.setCompletedAt(Instant.now());
         transaction = transactionRepository.save(transaction);
+
+        // Record WITHDRAWAL_COMPLETED operational audit event atomically within PostgreSQL transaction
+        auditEventService.recordEvent(
+                authenticatedUser != null ? authenticatedUser.getId() : null,
+                com.parth.ledger.audit.AuditEventType.WITHDRAWAL_COMPLETED,
+                com.parth.ledger.audit.AuditEntityType.TRANSACTION,
+                transaction.getId(),
+                java.util.Map.of(
+                        "amount", scaledAmount,
+                        "currency", currency,
+                        "sourceAccountId", sourceId
+                )
+        );
 
         log.info("Successfully executed withdrawal: txId={}, amount={} {}, userAccount={} to clearing={}",
                 transaction.getId(), scaledAmount, currency, sourceId, clearingId);

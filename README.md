@@ -116,6 +116,8 @@ The engine exposes a clean, versioned REST API (`/api/v1/`):
   - `GET /api/v1/accounts/{accountId}/statement`: Comprehensive financial statement over a date range including opening balance, closing balance, net cash flow, and running balances.
 - **Reconciliation (`/api/v1/reconciliation`)**:
   - `POST /reconcile`: Compare current account balance snapshots against historical ledger sums; reports drifts or discrepancies.
+- **Operational Audit Trail (`/api/v1/audit-events`)**:
+  - `GET /`: Authorized, paginated, and filtered record of security events (signup, login, logout, password change), account lifecycle events (creation, freeze, unfreeze, closure), and atomic financial completion events.
 
 ---
 
@@ -304,7 +306,7 @@ npm run lint
 # Run production build
 npm run build
 ```
-*Verification status: 190 tests passed, 0 lint warnings/errors, 13/13 static routes built successfully.*
+*Verification status: 197 tests passed, 0 lint warnings/errors, 14/14 static routes built successfully.*
 
 ---
 
@@ -315,6 +317,7 @@ financial-ledger-engine/
 ├── backend/                              # Spring Boot 3.3.3 application
 │   ├── src/main/java/com/parth/ledger/   # Package-by-feature domain packages
 │   │   ├── account/                      # Accounts, lifecycle, statement generation
+│   │   ├── audit/                        # Operational audit events & immutable history
 │   │   ├── auth/                         # Dual session-based auth (BCrypt + OAuth2)
 │   │   ├── common/                       # Base entities, global exception handler
 │   │   ├── ledger/                       # Double-entry ledger journal and repository
@@ -322,7 +325,7 @@ financial-ledger-engine/
 │   │   ├── reconciliation/               # Balance vs ledger drift audit engine
 │   │   ├── system/                       # System clearing & initial treasury funding
 │   │   └── transaction/                  # Atomic transfers, deposits, withdrawals
-│   └── src/main/resources/db/migration/  # Flyway database migrations (V1 to V9)
+│   └── src/main/resources/db/migration/  # Flyway database migrations (V1 to V10)
 ├── frontend/                             # Next.js 15 administrative application
 │   ├── __tests__/                        # Node test runner component and integration suites
 │   ├── app/                              # Next.js App Router pages and layouts
@@ -346,6 +349,7 @@ financial-ledger-engine/
 - [Account Statement API Specification (V8)](docs/ACCOUNT_STATEMENT_API.md)
 - [Withdrawal API Specification (V9)](docs/WITHDRAWAL_API.md)
 - [Account Lifecycle API Specification (V10)](docs/ACCOUNT_LIFECYCLE_API.md)
+- [Audit Trail & Operational Audit Events Specification](docs/AUDIT_TRAIL_API.md)
 - [Transfer API Specification](docs/TRANSFER_API.md)
 - [Authentication & Credentials Guide](docs/AUTHENTICATION_AND_CREDENTIALS.md)
 - [Rate Limiting & Load Testing Benchmarks](docs/RATE_LIMITING_AND_LOAD_TESTING.md)

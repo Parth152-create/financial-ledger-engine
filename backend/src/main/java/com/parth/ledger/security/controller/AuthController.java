@@ -46,6 +46,7 @@ public class AuthController {
     private final SecurityContextRepository securityContextRepository;
     private final RedisRateLimiterService rateLimiterService;
     private final ClientIpResolver clientIpResolver;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public AuthController(AuthenticatedUserService authenticatedUserService,
                           UserAuthService userAuthService,
@@ -54,7 +55,8 @@ public class AuthController {
                           CustomUserDetailsService customUserDetailsService,
                           SecurityContextRepository securityContextRepository,
                           RedisRateLimiterService rateLimiterService,
-                          ClientIpResolver clientIpResolver) {
+                          ClientIpResolver clientIpResolver,
+                          com.parth.ledger.audit.AuditEventService auditEventService) {
         this.authenticatedUserService = authenticatedUserService;
         this.userAuthService = userAuthService;
         this.userService = userService;
@@ -63,6 +65,7 @@ public class AuthController {
         this.securityContextRepository = securityContextRepository;
         this.rateLimiterService = rateLimiterService;
         this.clientIpResolver = clientIpResolver;
+        this.auditEventService = auditEventService;
     }
 
     /**
@@ -166,6 +169,14 @@ public class AuthController {
 
         User user = userService.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new UserNotFoundException("User not found for authenticated email: " + normalizedEmail));
+
+        auditEventService.recordEvent(
+                user.getId(),
+                com.parth.ledger.audit.AuditEventType.AUTH_LOGIN,
+                com.parth.ledger.audit.AuditEntityType.USER,
+                user.getId(),
+                java.util.Map.of("email", user.getEmail(), "method", "PASSWORD")
+        );
 
         return ResponseEntity.ok(UserResponseDto.from(user));
     }

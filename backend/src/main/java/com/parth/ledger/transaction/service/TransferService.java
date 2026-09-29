@@ -59,17 +59,20 @@ public class TransferService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public TransferService(AccountRepository accountRepository,
                            TransactionRepository transactionRepository,
                            LedgerEntryRepository ledgerEntryRepository,
                            IdempotencyCacheService idempotencyCacheService,
-                           AuthenticatedUserService authenticatedUserService) {
+                           AuthenticatedUserService authenticatedUserService,
+                           com.parth.ledger.audit.AuditEventService auditEventService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
     }
 
     /**
@@ -338,6 +341,20 @@ public class TransferService {
         transaction.setStatus(TransactionStatus.COMPLETED);
         transaction.setCompletedAt(Instant.now());
         transaction = transactionRepository.save(transaction);
+
+        // 17. Record TRANSFER_COMPLETED operational audit event atomically within PostgreSQL transaction
+        auditEventService.recordEvent(
+                authenticatedUser != null ? authenticatedUser.getId() : null,
+                com.parth.ledger.audit.AuditEventType.TRANSFER_COMPLETED,
+                com.parth.ledger.audit.AuditEntityType.TRANSACTION,
+                transaction.getId(),
+                java.util.Map.of(
+                        "amount", scaledAmount,
+                        "currency", currency,
+                        "sourceAccountId", sourceId,
+                        "destinationAccountId", destinationId
+                )
+        );
 
         log.info("Successfully executed transfer: txId={}, amount={} {}, from={} to={}",
                 transaction.getId(), scaledAmount, currency, sourceId, destinationId);

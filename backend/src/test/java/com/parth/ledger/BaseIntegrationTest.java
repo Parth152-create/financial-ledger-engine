@@ -43,10 +43,22 @@ public abstract class BaseIntegrationTest {
     protected org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @org.junit.jupiter.api.BeforeEach
-    void truncateLedgerEntriesBeforeEach() {
+    void truncateTablesBeforeEach() {
         if (jdbcTemplate != null) {
             try {
                 jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void truncateTablesAfterEach() {
+        if (jdbcTemplate != null) {
+            try {
+                jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");
             } catch (Exception ignored) {
             }
         }

@@ -28,11 +28,14 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public AccountService(AccountRepository accountRepository,
-                          AuthenticatedUserService authenticatedUserService) {
+                          AuthenticatedUserService authenticatedUserService,
+                          com.parth.ledger.audit.AuditEventService auditEventService) {
         this.accountRepository = accountRepository;
         this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
     }
 
     /**
@@ -76,6 +79,18 @@ public class AccountService {
         Account saved = accountRepository.save(account);
         log.info("Created USER_CHECKING account: id={}, accountNumber={}, currency={}, userId={}",
                 saved.getId(), saved.getAccountNumber(), saved.getCurrency(), currentUser.getId());
+
+        auditEventService.recordEvent(
+                currentUser.getId(),
+                com.parth.ledger.audit.AuditEventType.ACCOUNT_CREATED,
+                com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                saved.getId(),
+                java.util.Map.of(
+                        "accountType", saved.getAccountType().name(),
+                        "currency", saved.getCurrency(),
+                        "accountNumber", saved.getAccountNumber()
+                )
+        );
 
         return AccountResponseDto.from(saved);
     }
@@ -169,6 +184,21 @@ public class AccountService {
         Account saved = accountRepository.save(account);
         log.info("Account {} successfully frozen by admin", accountId);
 
+        UUID actorId = null;
+        try {
+            actorId = authenticatedUserService.getCurrentUser().getId();
+        } catch (Exception e) {
+            log.debug("Current user entity not found for administrative action; recording event with null actor: {}", e.getMessage());
+        }
+
+        auditEventService.recordEvent(
+                actorId,
+                com.parth.ledger.audit.AuditEventType.ACCOUNT_FROZEN,
+                com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                saved.getId(),
+                java.util.Map.of("status", AccountStatus.FROZEN.name())
+        );
+
         return AccountResponseDto.from(saved);
     }
 
@@ -213,6 +243,21 @@ public class AccountService {
         account.setStatus(AccountStatus.ACTIVE);
         Account saved = accountRepository.save(account);
         log.info("Account {} successfully unfrozen by admin", accountId);
+
+        UUID unfreezeActorId = null;
+        try {
+            unfreezeActorId = authenticatedUserService.getCurrentUser().getId();
+        } catch (Exception e) {
+            log.debug("Current user entity not found for administrative action; recording event with null actor: {}", e.getMessage());
+        }
+
+        auditEventService.recordEvent(
+                unfreezeActorId,
+                com.parth.ledger.audit.AuditEventType.ACCOUNT_UNFROZEN,
+                com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                saved.getId(),
+                java.util.Map.of("status", AccountStatus.ACTIVE.name())
+        );
 
         return AccountResponseDto.from(saved);
     }
@@ -264,6 +309,14 @@ public class AccountService {
         account.setStatus(AccountStatus.CLOSED);
         Account saved = accountRepository.save(account);
         log.info("Account {} successfully closed by owner {}", accountId, currentUser.getId());
+
+        auditEventService.recordEvent(
+                currentUser.getId(),
+                com.parth.ledger.audit.AuditEventType.ACCOUNT_CLOSED,
+                com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                saved.getId(),
+                java.util.Map.of("status", AccountStatus.CLOSED.name())
+        );
 
         return AccountResponseDto.from(saved);
     }

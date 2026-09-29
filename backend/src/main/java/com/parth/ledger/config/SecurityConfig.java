@@ -49,22 +49,30 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomOidcUserService customOidcUserService;
     private final ObjectMapper objectMapper;
     private final String allowedOriginsConfig;
     private final String frontendUrl;
+    private final org.springframework.beans.factory.ObjectProvider<com.parth.ledger.audit.AuditEventService> auditEventServiceProvider;
+    private final org.springframework.beans.factory.ObjectProvider<com.parth.ledger.security.AuthenticatedUserService> authenticatedUserServiceProvider;
 
     public SecurityConfig(CustomOAuth2UserService customOAuth2UserService,
                           CustomOidcUserService customOidcUserService,
                           ObjectMapper objectMapper,
                           @Value("${ledger.security.cors.allowed-origins:http://localhost:3000,http://localhost:3001}") String allowedOriginsConfig,
-                          @Value("${ledger.frontend-url:http://localhost:3001}") String frontendUrl) {
+                          @Value("${ledger.frontend-url:http://localhost:3001}") String frontendUrl,
+                          org.springframework.beans.factory.ObjectProvider<com.parth.ledger.audit.AuditEventService> auditEventServiceProvider,
+                          org.springframework.beans.factory.ObjectProvider<com.parth.ledger.security.AuthenticatedUserService> authenticatedUserServiceProvider) {
         this.customOAuth2UserService = customOAuth2UserService;
         this.customOidcUserService = customOidcUserService;
         this.objectMapper = objectMapper;
         this.allowedOriginsConfig = allowedOriginsConfig;
         this.frontendUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+        this.auditEventServiceProvider = auditEventServiceProvider;
+        this.authenticatedUserServiceProvider = authenticatedUserServiceProvider;
     }
 
     @Bean
@@ -161,6 +169,29 @@ public class SecurityConfig {
                 )
                 .logout(logout -> logout
                         .logoutUrl("/logout")
+                        .addLogoutHandler((request, response, authentication) -> {
+                            if (authentication != null && authentication.isAuthenticated()
+                                    && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+                                try {
+                                    com.parth.ledger.audit.AuditEventService auditService = auditEventServiceProvider.getIfAvailable();
+                                    com.parth.ledger.security.AuthenticatedUserService authUserService = authenticatedUserServiceProvider.getIfAvailable();
+                                    if (auditService != null && authUserService != null) {
+                                        com.parth.ledger.user.User user = authUserService.getUserFromAuthentication(authentication);
+                                        if (user != null) {
+                                            auditService.recordEvent(
+                                                    user.getId(),
+                                                    com.parth.ledger.audit.AuditEventType.AUTH_LOGOUT,
+                                                    com.parth.ledger.audit.AuditEntityType.USER,
+                                                    user.getId(),
+                                                    java.util.Map.of("email", user.getEmail())
+                                            );
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    log.warn("Failed to record logout audit event: {}", e.getMessage());
+                                }
+                            }
+                        })
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.OK))
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)

@@ -11,6 +11,7 @@ export const ROUTES = {
   LEDGER: "/app/ledger",
   ANALYTICS: "/app/analytics",
   RECONCILIATION: "/app/reconciliation",
+  AUDIT: "/app/audit",
   SETTINGS: "/app/settings",
 } as const
 
@@ -34,4 +35,5 @@ export const API_ROUTES = {
   STATEMENT: (accountId: string) => `/api/v1/accounts/${accountId}/statement`,
   RECONCILIATION_OVERALL: "/api/v1/reconciliation",
   RECONCILIATION_ACCOUNT: (accountId: string) => `/api/v1/reconciliation/accounts/${accountId}`,
+  AUDIT_EVENTS: "/api/v1/audit-events",
 } as const

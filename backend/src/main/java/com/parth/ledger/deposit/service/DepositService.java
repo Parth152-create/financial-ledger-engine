@@ -66,17 +66,20 @@ public class DepositService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public DepositService(AccountRepository accountRepository,
                           TransactionRepository transactionRepository,
                           LedgerEntryRepository ledgerEntryRepository,
                           IdempotencyCacheService idempotencyCacheService,
-                          AuthenticatedUserService authenticatedUserService) {
+                          AuthenticatedUserService authenticatedUserService,
+                          com.parth.ledger.audit.AuditEventService auditEventService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
     }
 
     /**
@@ -338,6 +341,19 @@ public class DepositService {
         transaction.setStatus(TransactionStatus.COMPLETED);
         transaction.setCompletedAt(Instant.now());
         transaction = transactionRepository.save(transaction);
+
+        // 18. Record DEPOSIT_COMPLETED operational audit event atomically within PostgreSQL transaction
+        auditEventService.recordEvent(
+                authenticatedUser != null ? authenticatedUser.getId() : null,
+                com.parth.ledger.audit.AuditEventType.DEPOSIT_COMPLETED,
+                com.parth.ledger.audit.AuditEntityType.TRANSACTION,
+                transaction.getId(),
+                java.util.Map.of(
+                        "amount", scaledAmount,
+                        "currency", currency,
+                        "destinationAccountId", destinationId
+                )
+        );
 
         log.info("Successfully executed deposit: txId={}, amount={} {}, clearing={} to userAccount={}",
                 transaction.getId(), scaledAmount, currency, clearingId, destinationId);

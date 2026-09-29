@@ -5,6 +5,7 @@ import {
   BookOpenText,
   BarChart3,
   Scale,
+  ShieldCheck,
   Settings,
   type LucideIcon,
 } from "lucide-react"
@@ -58,6 +59,12 @@ export const SITE_CONFIG = {
       title: "Reconciliation",
       href: ROUTES.RECONCILIATION,
       icon: Scale,
+      section: "Audit & Reporting",
+    },
+    {
+      title: "Audit Trail",
+      href: ROUTES.AUDIT,
+      icon: ShieldCheck,
       section: "Audit & Reporting",
     },
     {

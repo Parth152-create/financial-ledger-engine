@@ -25,15 +25,18 @@ public class UserAuthService {
     private final UserCredentialRepository userCredentialRepository;
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicyValidator passwordPolicyValidator;
+    private final com.parth.ledger.audit.AuditEventService auditEventService;
 
     public UserAuthService(UserRepository userRepository,
                            UserCredentialRepository userCredentialRepository,
                            PasswordEncoder passwordEncoder,
-                           PasswordPolicyValidator passwordPolicyValidator) {
+                           PasswordPolicyValidator passwordPolicyValidator,
+                           com.parth.ledger.audit.AuditEventService auditEventService) {
         this.userRepository = userRepository;
         this.userCredentialRepository = userCredentialRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicyValidator = passwordPolicyValidator;
+        this.auditEventService = auditEventService;
     }
 
     /**
@@ -61,6 +64,15 @@ public class UserAuthService {
             String passwordHash = passwordEncoder.encode(request.password());
             userCredentialRepository.save(new UserCredential(user.getId(), passwordHash));
             log.info("Registered new user and credential successfully for user ID: {}", user.getId());
+
+            auditEventService.recordEvent(
+                    user.getId(),
+                    com.parth.ledger.audit.AuditEventType.AUTH_SIGNUP,
+                    com.parth.ledger.audit.AuditEntityType.USER,
+                    user.getId(),
+                    java.util.Map.of("email", user.getEmail(), "name", user.getName())
+            );
+
             return user;
         } catch (DataIntegrityViolationException e) {
             log.warn("Database conflict during user registration", e);
@@ -86,6 +98,14 @@ public class UserAuthService {
         credential.setPasswordHash(passwordHash);
         userCredentialRepository.save(credential);
         log.info("Linked/updated password credential for user ID: {}", user.getId());
+
+        auditEventService.recordEvent(
+                user.getId(),
+                com.parth.ledger.audit.AuditEventType.PASSWORD_CHANGED,
+                com.parth.ledger.audit.AuditEntityType.USER,
+                user.getId(),
+                java.util.Map.of("action", "PASSWORD_LINKED_OR_UPDATED")
+        );
     }
 
     /**
