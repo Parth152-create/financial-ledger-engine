@@ -104,7 +104,7 @@ public class SystemFundingService {
     }
 
     /**
-     * Ensures bootstrap platform funding using the default funding amount ($10,000,000.0000).
+     * Ensures bootstrap platform funding using the default funding amount (10,000,000.0000 INR).
      *
      * @return The funded SYSTEM_CLEARING Account entity.
      */

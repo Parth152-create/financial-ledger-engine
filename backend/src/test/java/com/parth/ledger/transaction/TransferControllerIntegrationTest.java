@@ -51,9 +51,9 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private LedgerEntryRepository ledgerEntryRepository;
 
-    private Account aliceUsdAccount;
-    private Account bobUsdAccount;
-    private Account charlieEurAccount;
+    private Account aliceAccount;
+    private Account bobAccount;
+    private Account charlieAccount;
 
     @BeforeEach
     void setUp() {
@@ -67,17 +67,17 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         User bob = userRepository.save(new User("bob.api@ledger.com", "Bob"));
         User charlie = userRepository.save(new User("charlie.api@ledger.com", "Charlie"));
 
-        aliceUsdAccount = accountRepository.save(new Account(alice, "INR", new BigDecimal("1000.0000")));
-        bobUsdAccount = accountRepository.save(new Account(bob, "INR", new BigDecimal("500.0000")));
-        charlieEurAccount = accountRepository.save(new Account(charlie, "INR", new BigDecimal("300.0000")));
+        aliceAccount = accountRepository.save(new Account(alice, "INR", new BigDecimal("1000.0000")));
+        bobAccount = accountRepository.save(new Account(bob, "INR", new BigDecimal("500.0000")));
+        charlieAccount = accountRepository.save(new Account(charlie, "INR", new BigDecimal("300.0000")));
     }
 
     @Test
     @DisplayName("POST /api/v1/transfers: successful transfer returns 200 OK and response DTO")
     void verifySuccessfulTransferEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("100.0000"),
                 "INR"
         );
@@ -90,8 +90,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.transactionId", notNullValue()))
                 .andExpect(jsonPath("$.status", is("COMPLETED")))
-                .andExpect(jsonPath("$.sourceAccountId", is(aliceUsdAccount.getId().toString())))
-                .andExpect(jsonPath("$.destinationAccountId", is(bobUsdAccount.getId().toString())))
+                .andExpect(jsonPath("$.sourceAccountId", is(aliceAccount.getId().toString())))
+                .andExpect(jsonPath("$.destinationAccountId", is(bobAccount.getId().toString())))
                 .andExpect(jsonPath("$.amount", is(100.0)))
                 .andExpect(jsonPath("$.currency", is("INR")))
                 .andExpect(jsonPath("$.createdAt", notNullValue()))
@@ -102,8 +102,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: missing Idempotency-Key header returns 400 Bad Request")
     void verifyMissingIdempotencyKeyHeader() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("100.0000"),
                 "INR"
         );
@@ -121,8 +121,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: insufficient balance returns 422 Unprocessable Content")
     void verifyInsufficientBalanceEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("5000.0000"),
                 "INR"
         );
@@ -141,8 +141,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: same source and destination accounts returns 400 Bad Request")
     void verifySameAccountTransferEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                aliceUsdAccount.getId(),
+                aliceAccount.getId(),
+                aliceAccount.getId(),
                 new BigDecimal("50.0000"),
                 "INR"
         );
@@ -161,8 +161,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: non-INR currency returns 400 Bad Request")
     void verifyCurrencyMismatchEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                charlieEurAccount.getId(),
+                aliceAccount.getId(),
+                charlieAccount.getId(),
                 new BigDecimal("50.0000"),
                 "USD"
         );
@@ -181,8 +181,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: idempotency conflict returns 409 Conflict")
     void verifyIdempotencyConflictEndpoint() throws Exception {
         TransferRequestDto request1 = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("50.0000"),
                 "INR"
         );
@@ -197,8 +197,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
 
         // Second transfer with different amount returns 409 Conflict
         TransferRequestDto request2 = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("75.0000"),
                 "INR"
         );
@@ -217,8 +217,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("POST /api/v1/transfers: repeated identical idempotency key returns 200 OK with same transaction")
     void verifyIdempotentRetryEndpoint() throws Exception {
         TransferRequestDto request = new TransferRequestDto(
-                aliceUsdAccount.getId(),
-                bobUsdAccount.getId(),
+                aliceAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("50.0000"),
                 "INR"
         );
@@ -252,7 +252,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
         UUID nonExistentId = UUID.randomUUID();
         TransferRequestDto request = new TransferRequestDto(
                 nonExistentId,
-                bobUsdAccount.getId(),
+                bobAccount.getId(),
                 new BigDecimal("50.0000"),
                 "INR"
         );
@@ -277,7 +277,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                     "amount": -50.00,
                     "currency": "INR"
                 }
-                """.formatted(aliceUsdAccount.getId(), bobUsdAccount.getId());
+                """.formatted(aliceAccount.getId(), bobAccount.getId());
 
         mockMvc.perform(post("/api/v1/transfers")
                         .with(csrf())

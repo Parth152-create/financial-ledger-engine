@@ -107,13 +107,15 @@ In V1, `accounts.user_id` had a `NOT NULL` constraint referencing `users(id)`. R
 This guarantees that `USER_CHECKING` accounts must always belong to an authenticated user, while `SYSTEM_CLEARING` accounts are platform-managed without fake user entities.
 
 ### Initial Seed Setup
-The Flyway V2 migration seeds an initial platform-owned system clearing account for supported currency `USD`:
+The Flyway V2 migration seeds an initial platform-owned system clearing account:
 - ID: `00000000-0000-0000-0000-000000000001`
 - Type: `SYSTEM_CLEARING`
 - Status: `ACTIVE`
-- Currency: `USD`
+- Currency: Initially `USD` in V2; migrated to `INR` in V9 (`V9__migrate_to_inr_platform_currency.sql`)
 - Balance: `0.0000`
 - Account Number: `ACCT-SYSTEM-CLEARING-01`
+
+> **Note on Currency Evolution**: While V2 originally seeded the clearing account in `USD`, the platform was migrated to single-currency Indian Rupees (`INR`) in Flyway migration `V9__migrate_to_inr_platform_currency.sql`, which converted all historical records to `INR` and attached the `chk_accounts_currency_inr` constraint.
 
 ---
 
@@ -138,4 +140,4 @@ The migration `V2__harden_account_model.sql` applies the following changes:
    - `idx_accounts_account_type ON accounts(account_type)`
    - `idx_accounts_status ON accounts(status)`
 5. **System Account Seed**:
-   - Seeds initial `SYSTEM_CLEARING` account for `USD`.
+   - Seeds initial `SYSTEM_CLEARING` account (subsequently updated to `INR` in V9).

@@ -8,8 +8,6 @@ The Transaction History API provides a read-only, paginated, and filtered view o
 > - No transactions are created or updated.
 > - No ledger entries are created or modified.
 > - No idempotency state or Redis keys are touched.
-> - No withdrawal logic is implemented in this milestone.
-> - Running balances and periodic statements are deferred to V8.
 
 ---
 
@@ -60,8 +58,8 @@ To provide a clear accounting perspective relative to the requested account, eac
    - Caller account is destination: `CREDIT`
 2. **DEPOSIT**:
    - Source is `SYSTEM_CLEARING`, destination is caller account: `CREDIT`
-3. **WITHDRAWAL** (Domain reserved, deferred to V9):
-   - Source is caller account: `DEBIT`
+3. **WITHDRAWAL**:
+   - Source is caller account, destination is `SYSTEM_CLEARING`: `DEBIT`
 
 ---
 
@@ -102,7 +100,7 @@ PostgreSQL executes a `BitmapOr` scan combining both indexes, maintaining logari
       "sourceAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "destinationAccountId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "amount": 25.5000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Lunch split",
       "status": "COMPLETED",
       "initiatedByUserId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
@@ -167,7 +165,7 @@ Cookie: JSESSIONID=...
       "sourceAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "destinationAccountId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "amount": 50.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Coffee supplies",
       "status": "COMPLETED",
       "initiatedByUserId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
@@ -181,7 +179,7 @@ Cookie: JSESSIONID=...
       "sourceAccountId": "00000000-0000-0000-0000-000000000001",
       "destinationAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "amount": 1000.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Initial funding",
       "status": "COMPLETED",
       "initiatedByUserId": null,
@@ -220,7 +218,7 @@ Cookie: JSESSIONID=...
       "sourceAccountId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "destinationAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "amount": 15.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Reimbursement",
       "status": "COMPLETED",
       "initiatedByUserId": "e5f6a7b8-c901-2345-def0-123456789abc",
@@ -234,7 +232,7 @@ Cookie: JSESSIONID=...
       "sourceAccountId": "00000000-0000-0000-0000-000000000001",
       "destinationAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "amount": 250.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Supplemental funding",
       "status": "COMPLETED",
       "initiatedByUserId": null,
@@ -273,7 +271,7 @@ Cookie: JSESSIONID=...
       "sourceAccountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "destinationAccountId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
       "amount": 50.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Coffee supplies",
       "status": "COMPLETED",
       "initiatedByUserId": "c3d4e5f6-a7b8-9012-cdef-123456789012",

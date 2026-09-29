@@ -271,7 +271,7 @@ test("7. Failed Account Creation: handles HTTP error statuses without leaking te
 // ----------------------------------------------------------------------------
 // 8. Account Detail Rendering
 // ----------------------------------------------------------------------------
-test("8. Account Detail Rendering: presents account number, metadata, balance, and operational ID", () => {
+test("8. Account Detail Rendering: presents account number, metadata, balance, and account ID", () => {
   const account = {
     accountId: "123e4567-e89b-12d3-a456-426614174000",
     accountNumber: "ACCT-87654321",

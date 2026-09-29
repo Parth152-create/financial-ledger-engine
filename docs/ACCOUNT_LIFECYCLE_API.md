@@ -98,8 +98,8 @@ Suspends an active checking account from participating in debits and credits.
 #### Example Request:
 ```http
 POST /api/v1/accounts/68c85770-ff61-4fa3-80a2-aa59c2c62c26/freeze HTTP/1.1
-Host: localhost:8080
-Authorization: Bearer <ADMIN_JWT>
+Host: localhost:8085
+Cookie: JSESSIONID=node01...
 ```
 
 #### Example Response (`200 OK`):
@@ -107,7 +107,7 @@ Authorization: Bearer <ADMIN_JWT>
 {
   "id": "68c85770-ff61-4fa3-80a2-aa59c2c62c26",
   "accountNumber": "ACCT-20260924-A1B2C3",
-  "currency": "USD",
+  "currency": "INR",
   "balance": 1500.0000,
   "accountType": "USER_CHECKING",
   "status": "FROZEN",
@@ -135,8 +135,8 @@ Restores a frozen checking account back to active status, re-enabling financial 
 #### Example Request:
 ```http
 POST /api/v1/accounts/68c85770-ff61-4fa3-80a2-aa59c2c62c26/unfreeze HTTP/1.1
-Host: localhost:8080
-Authorization: Bearer <ADMIN_JWT>
+Host: localhost:8085
+Cookie: JSESSIONID=node01...
 ```
 
 #### Example Response (`200 OK`):
@@ -144,7 +144,7 @@ Authorization: Bearer <ADMIN_JWT>
 {
   "id": "68c85770-ff61-4fa3-80a2-aa59c2c62c26",
   "accountNumber": "ACCT-20260924-A1B2C3",
-  "currency": "USD",
+  "currency": "INR",
   "balance": 1500.0000,
   "accountType": "USER_CHECKING",
   "status": "ACTIVE",
@@ -174,8 +174,8 @@ Permanently closes an account owned by the authenticated caller. Requires zero b
 #### Example Request:
 ```http
 POST /api/v1/accounts/68c85770-ff61-4fa3-80a2-aa59c2c62c26/close HTTP/1.1
-Host: localhost:8080
-Authorization: Bearer <USER_JWT>
+Host: localhost:8085
+Cookie: JSESSIONID=node01...
 ```
 
 #### Example Response (`200 OK`):
@@ -183,7 +183,7 @@ Authorization: Bearer <USER_JWT>
 {
   "id": "68c85770-ff61-4fa3-80a2-aa59c2c62c26",
   "accountNumber": "ACCT-20260924-A1B2C3",
-  "currency": "USD",
+  "currency": "INR",
   "balance": 0.0000,
   "accountType": "USER_CHECKING",
   "status": "CLOSED",

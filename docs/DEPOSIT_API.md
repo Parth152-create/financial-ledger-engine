@@ -37,7 +37,7 @@ Executes a deposit from the platform `SYSTEM_CLEARING` account into the authenti
 {
   "accountId": "2057aa37-194a-4448-8d91-1e8e8b431937",
   "amount": 100.0000,
-  "currency": "USD",
+  "currency": "INR",
   "description": "Initial funding"
 }
 ```
@@ -48,7 +48,7 @@ Executes a deposit from the platform `SYSTEM_CLEARING` account into the authenti
 |---|---|---|---|
 | `accountId` | `UUID` | Required, Not Null | ID of the destination user checking account |
 | `amount` | `BigDecimal` | Required, > 0.0000, scale ≤ 4 | Deposit amount in currency; max 4 decimal digits |
-| `currency` | `string` | Required, 3-letter ISO code (`USD`) | Currency code; must match destination and clearing account |
+| `currency` | `string` | Required, 3-letter ISO code (`INR`) | Currency code; must match destination and clearing account (`INR`) |
 | `description` | `string` | Optional, max 255 chars | Human-readable memo or reference |
 
 ### Disallowed Client Input
@@ -76,7 +76,7 @@ Returned when a deposit is processed and committed for the first time.
   "sourceAccountId": "00000000-0000-0000-0000-000000000001",
   "destinationAccountId": "2057aa37-194a-4448-8d91-1e8e8b431937",
   "amount": 100.0000,
-  "currency": "USD",
+  "currency": "INR",
   "description": "Initial funding",
   "idempotencyKey": "dep-basic-001",
   "initiatedByUserId": "c0a80123-9999-0000-0000-000000000001",
@@ -149,11 +149,9 @@ For a deposit of amount `X`:
 
 ## Currency Restrictions
 
-- Multi-currency deposits and FX conversions are not supported in V6.
-- The deposit currency must match:
-  1. The destination account currency
-  2. The `SYSTEM_CLEARING` account currency (`USD`)
-- Only `USD` deposits into `USD` accounts are currently permitted. Any currency mismatch is rejected before financial mutation.
+- Multi-currency deposits and FX conversions are not supported.
+- The platform operates strictly in Indian Rupees (`INR`), enforced at both application and database layers (`chk_accounts_currency_inr`, `chk_transactions_currency_inr`, `chk_ledger_entries_currency_inr`).
+- The deposit currency must be `INR` and match the destination account and `SYSTEM_CLEARING` account currency. Any non-INR currency is rejected with HTTP `400 Bad Request`.
 
 ---
 

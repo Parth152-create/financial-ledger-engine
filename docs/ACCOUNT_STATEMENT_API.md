@@ -94,7 +94,7 @@ Statement entries are ordered chronologically (`createdAt ASC, id ASC`). For eac
 {
   "accountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "accountNumber": "ACCT-41B21CF7DEA3",
-  "currency": "USD",
+  "currency": "INR",
   "openingBalance": 1000.0000,
   "entries": [
     {
@@ -102,7 +102,7 @@ Statement entries are ordered chronologically (`createdAt ASC, id ASC`). For eac
       "transactionType": "TRANSFER",
       "direction": "DEBIT",
       "amount": 200.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Invoice payment",
       "status": "COMPLETED",
       "createdAt": "2026-09-24T10:00:00Z",
@@ -114,7 +114,7 @@ Statement entries are ordered chronologically (`createdAt ASC, id ASC`). For eac
       "transactionType": "TRANSFER",
       "direction": "CREDIT",
       "amount": 350.0000,
-      "currency": "USD",
+      "currency": "INR",
       "description": "Client payment",
       "status": "COMPLETED",
       "createdAt": "2026-09-24T11:00:00Z",

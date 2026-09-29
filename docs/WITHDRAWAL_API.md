@@ -36,7 +36,7 @@ Executes a withdrawal from the authenticated user's `USER_CHECKING` account into
 {
   "accountId": "2057aa37-194a-4448-8d91-1e8e8b431937",
   "amount": 100.0000,
-  "currency": "USD",
+  "currency": "INR",
   "description": "ATM cash withdrawal"
 }
 ```
@@ -47,7 +47,7 @@ Executes a withdrawal from the authenticated user's `USER_CHECKING` account into
 |---|---|---|---|
 | `accountId` | `UUID` | Required, Not Null | ID of the source user checking account |
 | `amount` | `BigDecimal` | Required, > 0.0000, scale ≤ 4 | Withdrawal amount in currency; max 4 decimal digits |
-| `currency` | `string` | Required, 3-letter ISO code (`USD`) | Currency code; must match source account and clearing account |
+| `currency` | `string` | Required, 3-letter ISO code (`INR`) | Currency code; must match source account and clearing account (`INR`) |
 | `description` | `string` | Optional, max 255 chars | Human-readable memo or reference |
 
 ### Disallowed Client Input
@@ -75,7 +75,7 @@ Returned when a withdrawal is processed and committed for the first time.
   "sourceAccountId": "2057aa37-194a-4448-8d91-1e8e8b431937",
   "destinationAccountId": "00000000-0000-0000-0000-000000000001",
   "amount": 100.0000,
-  "currency": "USD",
+  "currency": "INR",
   "description": "ATM cash withdrawal",
   "idempotencyKey": "wdr-basic-001",
   "initiatedByUserId": "c0a80123-9999-0000-0000-000000000001",
@@ -150,11 +150,9 @@ For a withdrawal of amount `X`:
 
 ## Currency Restrictions
 
-- Multi-currency withdrawals and FX conversions are not supported in V9.
-- The withdrawal currency must match:
-  1. The source account currency
-  2. The `SYSTEM_CLEARING` account currency (`USD`)
-- Only `USD` withdrawals from `USD` accounts are currently permitted. Any currency mismatch is rejected before financial mutation.
+- Multi-currency withdrawals and FX conversions are not supported.
+- The platform operates strictly in Indian Rupees (`INR`), enforced at both application and database layers (`chk_accounts_currency_inr`, `chk_transactions_currency_inr`, `chk_ledger_entries_currency_inr`).
+- The withdrawal currency must be `INR` and match the source account and `SYSTEM_CLEARING` account currency. Any non-INR currency is rejected with HTTP `400 Bad Request`.
 
 ---
 

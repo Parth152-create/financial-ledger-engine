@@ -46,17 +46,17 @@ Creates a new `USER_CHECKING` account for the authenticated user in the requeste
 ##### Request Body
 ```json
 {
-  "currency": "USD"
+  "currency": "INR"
 }
 ```
 
 ##### Field Constraints
 | Field | Type | Required | Constraints | Description |
 |---|---|---|---|---|
-| `currency` | `string` | **Yes** | Exactly 3 uppercase alphabetic characters (`^[A-Z]{3}$`) matching ISO 4217 | Account currency |
+| `currency` | `string` | **Yes** | Exactly 3 uppercase alphabetic characters matching ISO 4217; platform currently enforces `INR` | Account currency |
 
 > **NOTE on Currency Validation**:
-> Lowercase or non-standard currency inputs (such as `"usd"`, `"US"`, or `"USDT"`) are rejected with `HTTP 400 Bad Request` to strictly align with the PostgreSQL check constraint `chk_accounts_currency_format`. Silently normalizing currencies is intentionally disallowed.
+> The platform currently enforces Indian Rupees (`INR`) as the single platform currency, guarded at the application level and backed by the PostgreSQL check constraint `chk_accounts_currency_inr`. Any non-INR currency (such as `"USD"`, `"EUR"`, or lowercase `"inr"`) is rejected with `HTTP 400 Bad Request`.
 
 ##### Success Response (`201 Created`)
 ```json
@@ -65,7 +65,7 @@ Creates a new `USER_CHECKING` account for the authenticated user in the requeste
   "accountNumber": "ACCT-4A9B3E2F1C0D",
   "accountType": "USER_CHECKING",
   "status": "ACTIVE",
-  "currency": "USD",
+  "currency": "INR",
   "balance": 0.0000,
   "createdAt": "2026-09-23T15:20:00.123456Z",
   "updatedAt": "2026-09-23T15:20:00.123456Z"
@@ -73,7 +73,7 @@ Creates a new `USER_CHECKING` account for the authenticated user in the requeste
 ```
 
 ##### Error Responses
-- `400 Bad Request`: Missing currency, blank currency, or invalid currency format.
+- `400 Bad Request`: Missing currency, blank currency, or non-INR currency.
 - `401 Unauthorized`: Unauthenticated request.
 
 ---
@@ -92,7 +92,7 @@ Returns a chronological list of all `USER_CHECKING` accounts owned by the authen
     "accountNumber": "ACCT-4A9B3E2F1C0D",
     "accountType": "USER_CHECKING",
     "status": "ACTIVE",
-    "currency": "USD",
+    "currency": "INR",
     "balance": 1500.0000,
     "createdAt": "2026-09-23T15:20:00.123456Z",
     "updatedAt": "2026-09-23T15:25:30.987654Z"
@@ -102,7 +102,7 @@ Returns a chronological list of all `USER_CHECKING` accounts owned by the authen
     "accountNumber": "ACCT-8C1D9F4E2A3B",
     "accountType": "USER_CHECKING",
     "status": "ACTIVE",
-    "currency": "EUR",
+    "currency": "INR",
     "balance": 0.0000,
     "createdAt": "2026-09-23T15:30:00.654321Z",
     "updatedAt": "2026-09-23T15:30:00.654321Z"
@@ -132,7 +132,7 @@ Retrieves account metadata and snapshot balance for a specific account owned by 
   "accountNumber": "ACCT-4A9B3E2F1C0D",
   "accountType": "USER_CHECKING",
   "status": "ACTIVE",
-  "currency": "USD",
+  "currency": "INR",
   "balance": 1500.0000,
   "createdAt": "2026-09-23T15:20:00.123456Z",
   "updatedAt": "2026-09-23T15:25:30.987654Z"
