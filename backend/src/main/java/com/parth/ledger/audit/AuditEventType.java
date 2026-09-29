@@ -17,8 +17,9 @@ public enum AuditEventType {
     ACCOUNT_UNFROZEN,
     ACCOUNT_CLOSED,
 
-    // Financial transaction completion events
+    // Financial transaction completion and reversal events
     TRANSFER_COMPLETED,
     DEPOSIT_COMPLETED,
-    WITHDRAWAL_COMPLETED
+    WITHDRAWAL_COMPLETED,
+    TRANSACTION_REVERSED
 }

@@ -20,7 +20,7 @@ public abstract class BaseIntegrationTest {
             .withDatabaseName("ledger_test")
             .withUsername("ledger_user")
             .withPassword("ledger_pass")
-            .withCommand("postgres", "-c", "max_connections=300");
+            .withCommand("postgres", "-c", "max_connections=600");
 
     protected static final GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(6379);
@@ -34,6 +34,8 @@ public abstract class BaseIntegrationTest {
     static void configureRedis(DynamicPropertyRegistry registry) {
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "2");
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
     }
 
     @Autowired(required = false)

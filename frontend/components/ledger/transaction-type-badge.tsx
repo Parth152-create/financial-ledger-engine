@@ -1,8 +1,8 @@
 import * as React from "react"
-import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight } from "lucide-react"
+import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, RotateCcw, Landmark } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type TransactionType = "TRANSFER" | "DEPOSIT" | "WITHDRAWAL"
+export type TransactionType = "TRANSFER" | "DEPOSIT" | "WITHDRAWAL" | "REVERSAL" | "SYSTEM_FUNDING"
 
 interface TransactionTypeBadgeProps {
   type: TransactionType | string
@@ -14,6 +14,8 @@ const TYPE_LABELS: Record<string, string> = {
   TRANSFER: "Transfer",
   DEPOSIT: "Deposit",
   WITHDRAWAL: "Withdrawal",
+  REVERSAL: "Reversal",
+  SYSTEM_FUNDING: "System Funding",
 }
 
 export function TransactionTypeBadge({
@@ -29,7 +31,11 @@ export function TransactionTypeBadge({
       ? ArrowLeftRight
       : normalized === "DEPOSIT"
       ? ArrowDownLeft
-      : ArrowUpRight
+      : normalized === "WITHDRAWAL"
+      ? ArrowUpRight
+      : normalized === "REVERSAL"
+      ? RotateCcw
+      : Landmark
 
   return (
     <span

@@ -31,4 +31,19 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID>, J
             UUID entityId,
             AuditEventType eventType
     );
+
+    /**
+     * Finds all audit events for a given entity type and entity id.
+     */
+    java.util.List<AuditEvent> findByEntityTypeAndEntityId(
+            AuditEntityType entityType,
+            UUID entityId
+    );
+
+    /**
+     * Finds all audit events by event type.
+     */
+    java.util.List<AuditEvent> findByEventType(
+            AuditEventType eventType
+    );
 }

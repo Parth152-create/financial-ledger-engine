@@ -10,6 +10,7 @@ export type AuditEventType =
   | "TRANSFER_COMPLETED"
   | "DEPOSIT_COMPLETED"
   | "WITHDRAWAL_COMPLETED"
+  | "TRANSACTION_REVERSED"
 
 export type AuditEntityType = "USER" | "ACCOUNT" | "TRANSACTION" | "SYSTEM"
 

@@ -32,10 +32,12 @@ export interface CompositionData {
   transfers: number
   deposits: number
   withdrawals: number
+  reversals: number
   total: number
   transferPct: number
   depositPct: number
   withdrawalPct: number
+  reversalPct: number
 }
 
 /**
@@ -217,7 +219,9 @@ export function calculateSuccessRate(
 }
 
 /**
- * Calculates transaction composition breakdown by type (TRANSFER, DEPOSIT, WITHDRAWAL).
+ * Calculates transaction composition breakdown by type (TRANSFER, DEPOSIT, WITHDRAWAL, REVERSAL).
+ * Represents Gross Financial Activity: all transaction events including compensating reversals
+ * are explicitly categorized without silent grouping or fallthrough.
  */
 export function calculateComposition(
   transactions: Array<{ transactionType: string }>
@@ -228,29 +232,35 @@ export function calculateComposition(
       transfers: 0,
       deposits: 0,
       withdrawals: 0,
+      reversals: 0,
       total: 0,
       transferPct: 0,
       depositPct: 0,
       withdrawalPct: 0,
+      reversalPct: 0,
     }
   }
 
   const transfers = transactions.filter((t) => t.transactionType === "TRANSFER").length
   const deposits = transactions.filter((t) => t.transactionType === "DEPOSIT").length
   const withdrawals = transactions.filter((t) => t.transactionType === "WITHDRAWAL").length
+  const reversals = transactions.filter((t) => t.transactionType === "REVERSAL").length
 
   const transferPct = Math.round((transfers / total) * 100)
   const depositPct = Math.round((deposits / total) * 100)
-  const withdrawalPct = Math.max(0, 100 - transferPct - depositPct)
+  const withdrawalPct = Math.round((withdrawals / total) * 100)
+  const reversalPct = Math.round((reversals / total) * 100)
 
   return {
     transfers,
     deposits,
     withdrawals,
+    reversals,
     total,
     transferPct,
     depositPct,
     withdrawalPct,
+    reversalPct,
   }
 }
 

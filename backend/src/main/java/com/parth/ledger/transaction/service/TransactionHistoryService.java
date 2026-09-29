@@ -132,9 +132,27 @@ public class TransactionHistoryService {
 
         Page<Transaction> transactionPage = transactionRepository.findAll(spec, pageable);
 
-        Page<TransactionHistoryItemDto> dtoPage = transactionPage.map(
-                tx -> TransactionHistoryItemDto.from(tx, account.getId())
-        );
+        java.util.List<UUID> txIds = transactionPage.getContent().stream()
+                .map(Transaction::getId)
+                .toList();
+
+        java.util.Map<UUID, UUID> reversalMap = java.util.Collections.emptyMap();
+        if (!txIds.isEmpty()) {
+            java.util.List<Transaction> reversals = transactionRepository.findByReversesTransactionIdIn(txIds);
+            reversalMap = reversals.stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            tx -> tx.getReversesTransaction().getId(),
+                            Transaction::getId,
+                            (existing, replacement) -> existing
+                    ));
+        }
+
+        final java.util.Map<UUID, UUID> finalReversalMap = reversalMap;
+        Page<TransactionHistoryItemDto> dtoPage = transactionPage.map(tx -> {
+            UUID reversalId = finalReversalMap.get(tx.getId());
+            boolean reversed = reversalId != null;
+            return TransactionHistoryItemDto.from(tx, account.getId(), reversed, reversalId);
+        });
 
         return TransactionHistoryPageResponseDto.from(dtoPage);
     }

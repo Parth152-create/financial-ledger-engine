@@ -1,5 +1,6 @@
 package com.parth.ledger.idempotency;
 
+import com.parth.ledger.transaction.dto.ReversalResponseDto;
 import com.parth.ledger.transaction.dto.TransactionResponseDto;
 import com.parth.ledger.transaction.dto.TransferResponseDto;
 import org.slf4j.Logger;
@@ -138,6 +139,39 @@ public class IdempotencyCacheService {
             log.debug("Cached transaction response in Redis for key '{}' with TTL {}", redisKey, ttl);
         } catch (Exception e) {
             log.warn("Redis error while caching idempotency key '{}': {}. Transaction remains committed in PostgreSQL.",
+                    redisKey, e.getMessage());
+        }
+    }
+
+    /**
+     * Caches a successfully committed reversal response with the default configured TTL.
+     * Fails open so Redis errors never rollback or fail a committed transaction.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param responseDto Reversal response to cache.
+     */
+    public void set(String idempotencyKey, ReversalResponseDto responseDto) {
+        set(idempotencyKey, responseDto, this.defaultTtl);
+    }
+
+    /**
+     * Caches a successfully committed reversal response with a specific custom TTL.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param responseDto Reversal response to cache.
+     * @param ttl Custom time-to-live duration.
+     */
+    public void set(String idempotencyKey, ReversalResponseDto responseDto, Duration ttl) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || responseDto == null) {
+            return;
+        }
+        String redisKey = buildKey(idempotencyKey);
+        try {
+            String json = objectMapper.writeValueAsString(responseDto);
+            redisTemplate.opsForValue().set(redisKey, json, ttl);
+            log.debug("Cached reversal response in Redis for key '{}' with TTL {}", redisKey, ttl);
+        } catch (Exception e) {
+            log.warn("Redis error while caching idempotency key '{}': {}. Reversal remains committed in PostgreSQL.",
                     redisKey, e.getMessage());
         }
     }

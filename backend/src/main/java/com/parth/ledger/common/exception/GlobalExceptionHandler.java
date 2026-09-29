@@ -8,6 +8,9 @@ import com.parth.ledger.transaction.exception.IdempotencyConflictException;
 import com.parth.ledger.transaction.exception.InsufficientBalanceException;
 import com.parth.ledger.transaction.exception.InvalidAmountException;
 import com.parth.ledger.transaction.exception.SameAccountTransferException;
+import com.parth.ledger.transaction.exception.TransactionAlreadyReversedException;
+import com.parth.ledger.transaction.exception.TransactionNotFoundException;
+import com.parth.ledger.transaction.exception.TransactionNotReversibleException;
 import com.parth.ledger.transaction.exception.UnbalancedLedgerException;
 import com.parth.ledger.security.AccountOwnershipException;
 import com.parth.ledger.security.DuplicateEmailException;
@@ -48,6 +51,42 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionNotFound(TransactionNotFoundException ex, HttpServletRequest request) {
+        log.warn("Transaction not found: {}", ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(TransactionAlreadyReversedException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionAlreadyReversed(TransactionAlreadyReversedException ex, HttpServletRequest request) {
+        log.warn("Transaction already reversed: {}", ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(TransactionNotReversibleException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionNotReversible(TransactionNotReversibleException ex, HttpServletRequest request) {
+        log.warn("Transaction not reversible: {}", ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.UNPROCESSABLE_CONTENT.value(),
+                HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
     }
 
     @ExceptionHandler(InsufficientBalanceException.class)
@@ -210,6 +249,16 @@ public class GlobalExceptionHandler {
                     HttpStatus.CONFLICT.value(),
                     HttpStatus.CONFLICT.getReasonPhrase(),
                     "Idempotency conflict: a transaction with this idempotency key already exists or is being processed",
+                    request.getRequestURI()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        if (message.contains("uk_transactions_reverses_transaction_id") || message.contains("reverses_transaction_id") || message.contains("uk_audit_events_transaction_reversed")) {
+            log.warn("Database unique constraint violation on reversal: {}", message);
+            ErrorResponse response = new ErrorResponse(
+                    HttpStatus.CONFLICT.value(),
+                    HttpStatus.CONFLICT.getReasonPhrase(),
+                    "Transaction has already been reversed",
                     request.getRequestURI()
             );
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);

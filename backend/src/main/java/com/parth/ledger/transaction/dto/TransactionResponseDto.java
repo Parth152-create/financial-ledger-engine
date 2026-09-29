@@ -24,8 +24,26 @@ public record TransactionResponseDto(
         String idempotencyKey,
         UUID initiatedByUserId,
         Instant createdAt,
-        Instant completedAt
+        Instant completedAt,
+        UUID reversesTransactionId
 ) {
+    public TransactionResponseDto(
+            UUID transactionId,
+            TransactionType transactionType,
+            TransactionStatus status,
+            UUID sourceAccountId,
+            UUID destinationAccountId,
+            BigDecimal amount,
+            String currency,
+            String description,
+            String idempotencyKey,
+            UUID initiatedByUserId,
+            Instant createdAt,
+            Instant completedAt
+    ) {
+        this(transactionId, transactionType, status, sourceAccountId, destinationAccountId, amount, currency, description, idempotencyKey, initiatedByUserId, createdAt, completedAt, null);
+    }
+
     public static TransactionResponseDto from(Transaction tx) {
         return new TransactionResponseDto(
                 tx.getId(),
@@ -39,7 +57,8 @@ public record TransactionResponseDto(
                 tx.getIdempotencyKey(),
                 tx.getInitiatedByUser() != null ? tx.getInitiatedByUser().getId() : null,
                 tx.getCreatedAt(),
-                tx.getCompletedAt()
+                tx.getCompletedAt(),
+                tx.getReversesTransactionId()
         );
     }
 }

@@ -9,5 +9,6 @@ public enum TransactionType {
     TRANSFER,
     DEPOSIT,
     WITHDRAWAL,
-    SYSTEM_FUNDING
+    SYSTEM_FUNDING,
+    REVERSAL
 }

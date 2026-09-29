@@ -25,9 +25,33 @@ public record TransactionHistoryItemDto(
         TransactionStatus status,
         UUID initiatedByUserId,
         Instant createdAt,
-        Instant completedAt
+        Instant completedAt,
+        boolean reversed,
+        UUID reversalTransactionId,
+        UUID reversesTransactionId
 ) {
+    public TransactionHistoryItemDto(
+            UUID transactionId,
+            TransactionType transactionType,
+            TransactionDirection direction,
+            UUID sourceAccountId,
+            UUID destinationAccountId,
+            BigDecimal amount,
+            String currency,
+            String description,
+            TransactionStatus status,
+            UUID initiatedByUserId,
+            Instant createdAt,
+            Instant completedAt
+    ) {
+        this(transactionId, transactionType, direction, sourceAccountId, destinationAccountId, amount, currency, description, status, initiatedByUserId, createdAt, completedAt, false, null, null);
+    }
+
     public static TransactionHistoryItemDto from(Transaction tx, UUID requestedAccountId) {
+        return from(tx, requestedAccountId, false, null);
+    }
+
+    public static TransactionHistoryItemDto from(Transaction tx, UUID requestedAccountId, boolean reversed, UUID reversalTransactionId) {
         TransactionDirection direction = tx.getSourceAccount().getId().equals(requestedAccountId)
                 ? TransactionDirection.DEBIT
                 : TransactionDirection.CREDIT;
@@ -44,7 +68,10 @@ public record TransactionHistoryItemDto(
                 tx.getStatus(),
                 tx.getInitiatedByUser() != null ? tx.getInitiatedByUser().getId() : null,
                 tx.getCreatedAt(),
-                tx.getCompletedAt()
+                tx.getCompletedAt(),
+                reversed,
+                reversalTransactionId,
+                tx.getReversesTransactionId()
         );
     }
 }

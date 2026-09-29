@@ -83,7 +83,7 @@ The system is deliberately structured as a **modular monolith** following a pack
 ## 5. Technology Stack
 
 - **Backend**: Java 21, Spring Boot 3.3.3, Spring Data JPA, Spring Security, Hibernate 6.5
-- **Database**: PostgreSQL 16 with Flyway migration versioning (V1–V9)
+- **Database**: PostgreSQL 16 with Flyway migration versioning (V1–V11)
 - **Caching & Rate Limiting**: Redis 7 (Alpine), Jedis / Spring Data Redis, Lua scripts
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Lucide React
 - **Testing**: JUnit 5, Testcontainers (PostgreSQL 16 & Redis 7), Mockito, Node.js Test Runner
@@ -112,12 +112,14 @@ The engine exposes a clean, versioned REST API (`/api/v1/`):
   - `POST /api/v1/transfers`: Atomic peer-to-peer transfer between accounts with deterministic locking and idempotency key.
   - `POST /api/v1/accounts/{accountId}/deposit`: Deposit funds from `SYSTEM_CLEARING` into an active account.
   - `POST /api/v1/accounts/{accountId}/withdraw`: Withdraw funds from an active account back to `SYSTEM_CLEARING`.
-  - `GET /api/v1/accounts/{accountId}/transactions`: Paginated, filtered, reverse-chronological transaction history with relative debit/credit direction flags.
+  - `POST /api/v1/transactions/{transactionId}/reversal`: Atomic compensating double-entry reversal of a completed transfer, deposit, or withdrawal with idempotency protection.
+  - `GET /api/v1/transactions/{transactionId}`: Fetch transaction details including compensating reversal references.
+  - `GET /api/v1/accounts/{accountId}/transactions`: Paginated, filtered, reverse-chronological transaction history with relative debit/credit direction flags and reversal indicators.
   - `GET /api/v1/accounts/{accountId}/statement`: Comprehensive financial statement over a date range including opening balance, closing balance, net cash flow, and running balances.
 - **Reconciliation (`/api/v1/reconciliation`)**:
   - `POST /reconcile`: Compare current account balance snapshots against historical ledger sums; reports drifts or discrepancies.
 - **Operational Audit Trail (`/api/v1/audit-events`)**:
-  - `GET /`: Authorized, paginated, and filtered record of security events (signup, login, logout, password change), account lifecycle events (creation, freeze, unfreeze, closure), and atomic financial completion events.
+  - `GET /`: Authorized, paginated, and filtered record of security events (signup, login, logout, password change), account lifecycle events (creation, freeze, unfreeze, closure), atomic financial completion events, and transaction reversals (`TRANSACTION_REVERSED`).
 
 ---
 
@@ -306,7 +308,7 @@ npm run lint
 # Run production build
 npm run build
 ```
-*Verification status: 197 tests passed, 0 lint warnings/errors, 14/14 static routes built successfully.*
+*Verification status: 512 backend tests passed, 207 frontend tests passed, 0 lint warnings/errors, 14/14 static and dynamic routes compiled successfully.*
 
 ---
 
@@ -324,8 +326,8 @@ financial-ledger-engine/
 │   │   ├── ratelimit/                    # Redis Lua token bucket rate limiting
 │   │   ├── reconciliation/               # Balance vs ledger drift audit engine
 │   │   ├── system/                       # System clearing & initial treasury funding
-│   │   └── transaction/                  # Atomic transfers, deposits, withdrawals
-│   └── src/main/resources/db/migration/  # Flyway database migrations (V1 to V10)
+│   │   └── transaction/                  # Atomic transfers, deposits, withdrawals, reversals
+│   └── src/main/resources/db/migration/  # Flyway database migrations (V1 to V11)
 ├── frontend/                             # Next.js 15 administrative application
 │   ├── __tests__/                        # Node test runner component and integration suites
 │   ├── app/                              # Next.js App Router pages and layouts
@@ -349,7 +351,8 @@ financial-ledger-engine/
 - [Account Statement API Specification (V8)](docs/ACCOUNT_STATEMENT_API.md)
 - [Withdrawal API Specification (V9)](docs/WITHDRAWAL_API.md)
 - [Account Lifecycle API Specification (V10)](docs/ACCOUNT_LIFECYCLE_API.md)
-- [Audit Trail & Operational Audit Events Specification](docs/AUDIT_TRAIL_API.md)
+- [Audit Trail & Operational Audit Events Specification (V2.1)](docs/AUDIT_TRAIL_API.md)
+- [Transaction Reversals & Compensating Transactions (V2.2)](docs/TRANSACTION_REVERSAL_API.md)
 - [Transfer API Specification](docs/TRANSFER_API.md)
 - [Authentication & Credentials Guide](docs/AUTHENTICATION_AND_CREDENTIALS.md)
 - [Rate Limiting & Load Testing Benchmarks](docs/RATE_LIMITING_AND_LOAD_TESTING.md)

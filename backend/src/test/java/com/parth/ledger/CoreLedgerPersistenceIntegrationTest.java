@@ -28,16 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
-@Testcontainers
-class CoreLedgerPersistenceIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("ledger_test")
-            .withUsername("ledger_user")
-            .withPassword("ledger_pass");
+class CoreLedgerPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;

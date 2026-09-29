@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
-import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, PieChart as PieChartIcon } from "lucide-react"
+import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, RotateCcw, PieChart as PieChartIcon } from "lucide-react"
 
 interface TransactionCompositionCardProps {
   transfers: number
   deposits: number
   withdrawals: number
+  reversals?: number
   total: number
   isLoading?: boolean
 }
@@ -26,6 +27,7 @@ export function TransactionCompositionCard({
   transfers,
   deposits,
   withdrawals,
+  reversals = 0,
   total,
   isLoading = false,
 }: TransactionCompositionCardProps) {
@@ -72,7 +74,8 @@ export function TransactionCompositionCard({
 
   const transferPct = Math.round((transfers / total) * 100)
   const depositPct = Math.round((deposits / total) * 100)
-  const withdrawalPct = Math.max(0, 100 - transferPct - depositPct)
+  const withdrawalPct = Math.round((withdrawals / total) * 100)
+  const reversalPct = Math.round((reversals / total) * 100)
 
   const chartData = [
     {
@@ -95,6 +98,13 @@ export function TransactionCompositionCard({
       count: withdrawals,
       pct: withdrawalPct,
       fill: "#f59e0b",
+    },
+    {
+      name: "Reversal",
+      type: "REVERSAL",
+      count: reversals,
+      pct: reversalPct,
+      fill: "#8b5cf6",
     },
   ].filter((item) => item.count > 0)
 
@@ -196,6 +206,20 @@ export function TransactionCompositionCard({
               </span>
             </div>
           </div>
+
+          <div className="flex items-center justify-between p-2.5 rounded-xs border border-border/50 bg-muted/20">
+            <div className="flex items-center gap-2">
+              <span className="size-2.5 rounded-full bg-purple-500 shrink-0" />
+              <RotateCcw className="size-3 text-muted-foreground" />
+              <span className="font-medium text-foreground">Reversal</span>
+            </div>
+            <div className="flex items-center gap-3 font-mono">
+              <span className="text-foreground font-semibold">{reversals}</span>
+              <span className="text-muted-foreground text-[11px] w-12 text-right">
+                ({reversalPct}%)
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -204,7 +228,7 @@ export function TransactionCompositionCard({
           Total: <strong className="text-foreground font-mono">{total}</strong> transactions
         </span>
         <span className="font-mono text-[11px] text-muted-foreground/80">
-          Based on retrieved transactions
+          Gross activity (Balance Trend tracks net movement)
         </span>
       </div>
     </div>

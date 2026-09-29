@@ -149,29 +149,35 @@ function calculateComposition(transactions) {
       transfers: 0,
       deposits: 0,
       withdrawals: 0,
+      reversals: 0,
       total: 0,
       transferPct: 0,
       depositPct: 0,
       withdrawalPct: 0,
+      reversalPct: 0,
     }
   }
 
   const transfers = transactions.filter((t) => t.transactionType === "TRANSFER").length
   const deposits = transactions.filter((t) => t.transactionType === "DEPOSIT").length
   const withdrawals = transactions.filter((t) => t.transactionType === "WITHDRAWAL").length
+  const reversals = transactions.filter((t) => t.transactionType === "REVERSAL").length
 
   const transferPct = Math.round((transfers / total) * 100)
   const depositPct = Math.round((deposits / total) * 100)
-  const withdrawalPct = Math.max(0, 100 - transferPct - depositPct)
+  const withdrawalPct = Math.round((withdrawals / total) * 100)
+  const reversalPct = Math.round((reversals / total) * 100)
 
   return {
     transfers,
     deposits,
     withdrawals,
+    reversals,
     total,
     transferPct,
     depositPct,
     withdrawalPct,
+    reversalPct,
   }
 }
 
@@ -483,35 +489,87 @@ test("12. Zero-Transaction Handling: zero transactions produces clean empty stat
 // TRANSACTION COMPOSITION CARD & BREAKDOWN TESTS
 // -------------------------------------------------------------
 
-test("13. Transaction Composition Breakdown: calculates count and percentage for TRANSFER, DEPOSIT, WITHDRAWAL", () => {
+test("13. Transaction Composition Breakdown: calculates count and percentage for TRANSFER, DEPOSIT, WITHDRAWAL, REVERSAL", () => {
   const txs = [
     { transactionType: "TRANSFER" },
     { transactionType: "TRANSFER" },
     { transactionType: "TRANSFER" },
     { transactionType: "DEPOSIT" },
     { transactionType: "WITHDRAWAL" },
+    { transactionType: "REVERSAL" },
   ]
 
   const composition = calculateComposition(txs)
-  assert.equal(composition.total, 5)
+  assert.equal(composition.total, 6)
   assert.equal(composition.transfers, 3)
-  assert.equal(composition.transferPct, 60)
+  assert.equal(composition.transferPct, 50)
   assert.equal(composition.deposits, 1)
-  assert.equal(composition.depositPct, 20)
+  assert.equal(composition.depositPct, 17)
   assert.equal(composition.withdrawals, 1)
-  assert.equal(composition.withdrawalPct, 20)
-  assert.equal(
-    composition.transferPct + composition.depositPct + composition.withdrawalPct,
-    100
-  )
+  assert.equal(composition.withdrawalPct, 17)
+  assert.equal(composition.reversals, 1)
+  assert.equal(composition.reversalPct, 17)
 })
 
-test("14. Transaction Composition Empty State: returns 0 retrieved and clean empty state when total === 0", () => {
+test("14. Transaction Composition Reversal Classification: does NOT silently classify REVERSAL as WITHDRAWAL", () => {
+  // A batch of transactions containing ONLY a transfer and a reversal
+  const txs = [
+    { transactionType: "TRANSFER" },
+    { transactionType: "REVERSAL" },
+  ]
+
+  const composition = calculateComposition(txs)
+  assert.equal(composition.total, 2)
+  assert.equal(composition.transfers, 1)
+  assert.equal(composition.transferPct, 50)
+  assert.equal(composition.withdrawals, 0, "Must NOT count reversals as withdrawals")
+  assert.equal(composition.withdrawalPct, 0, "Withdrawal percentage must be 0 when no withdrawals exist")
+  assert.equal(composition.reversals, 1, "Must count reversals in explicit reversal category")
+  assert.equal(composition.reversalPct, 50, "Reversal percentage must be accurately computed")
+})
+
+test("15. Analytics Policy: Gross Financial Activity semantics with Net Movement via Balance Trend", () => {
+  // Example from review:
+  // Original transfer: ₹3,000
+  // Reversal: ₹3,000
+  const txs = [
+    { createdAt: "2026-09-24T10:00:00Z", amount: 3000, currency: "INR", status: "COMPLETED", transactionType: "TRANSFER" },
+    { createdAt: "2026-09-24T10:05:00Z", amount: 3000, currency: "INR", status: "COMPLETED", transactionType: "REVERSAL" },
+  ]
+
+  // Policy A: Gross Financial Activity
+  // Volume represents gross transaction count (2 events)
+  const volumePoints = calculateVolumePoints(txs)
+  const totalVolume = txs.length
+  assert.equal(totalVolume, 2, "Gross volume must count both original transfer and compensating reversal")
+  assert.equal(volumePoints[0].volume, 2)
+
+  // Value represents gross financial throughput (₹6,000 total turnover)
+  const valuePoints = calculateValuePoints(txs, "INR")
+  const totalValue = txs.reduce((sum, tx) => safeAddAmounts(sum, tx.amount), 0)
+  assert.equal(totalValue, 6000.0, "Gross value must reflect total monetary throughput")
+  assert.equal(valuePoints[0].value, 6000.0)
+
+  // Net Movement is authoritatively represented via Balance Trend from statement entries:
+  // Starting at 10,000: transfer debits 3,000 (balance -> 7,000); reversal credits 3,000 (balance -> 10,000)
+  const statementEntries = [
+    { createdAt: "2026-09-24T10:00:00Z", balanceAfter: 7000 },
+    { createdAt: "2026-09-24T10:05:00Z", balanceAfter: 10000 },
+  ]
+  const balanceTrend = extractBalanceTrend(statementEntries)
+  assert.equal(balanceTrend.length, 2)
+  assert.equal(balanceTrend[0].balance, 7000)
+  assert.equal(balanceTrend[1].balance, 10000, "Balance trend accurately reflects net financial position")
+})
+
+test("16. Transaction Composition Empty State: returns 0 retrieved and clean empty state when total === 0", () => {
   const composition = calculateComposition([])
   assert.equal(composition.total, 0)
   assert.equal(composition.transfers, 0)
   assert.equal(composition.deposits, 0)
   assert.equal(composition.withdrawals, 0)
+  assert.equal(composition.reversals, 0)
+  assert.equal(composition.reversalPct, 0)
 })
 
 // -------------------------------------------------------------

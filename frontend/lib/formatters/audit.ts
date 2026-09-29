@@ -35,6 +35,14 @@ export const EVENT_TYPE_CONFIG: Record<AuditEventType, EventTypeConfig> = {
     bg: "bg-amber-500/10",
     border: "border-amber-500/20",
   },
+  TRANSACTION_REVERSED: {
+    label: "Transaction Reversed",
+    category: "financial",
+    dot: "bg-rose-500",
+    text: "text-rose-700 dark:text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/20",
+  },
   ACCOUNT_CREATED: {
     label: "Account Created",
     category: "account",
@@ -145,6 +153,13 @@ export function formatEventSummary(event: AuditEvent): string {
     case "WITHDRAWAL_COMPLETED": {
       const amount = meta.amount !== undefined ? formatINR(Number(meta.amount)) : null
       return amount ? `Withdrawal of ${amount}` : "Funds withdrawal completed"
+    }
+    case "TRANSACTION_REVERSED": {
+      const amount = meta.amount !== undefined ? formatINR(Number(meta.amount)) : null
+      const origType = (meta.originalTransactionType as string) || "transaction"
+      return amount
+        ? `Reversal of ${origType.toLowerCase()} for ${amount}`
+        : "Compensating transaction reversal completed"
     }
     case "ACCOUNT_CREATED": {
       const currency = (meta.currency as string) || "INR"

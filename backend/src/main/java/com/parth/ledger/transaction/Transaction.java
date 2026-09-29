@@ -60,6 +60,10 @@ public class Transaction {
     @JoinColumn(name = "destination_account_id", nullable = false, updatable = false)
     private Account destinationAccount;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reverses_transaction_id", updatable = false)
+    private Transaction reversesTransaction;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -76,7 +80,7 @@ public class Transaction {
                        TransactionStatus status,
                        Account sourceAccount,
                        Account destinationAccount) {
-        this(idempotencyKey, amount, currency, status, sourceAccount, destinationAccount, TransactionType.TRANSFER, sourceAccount != null ? sourceAccount.getUser() : null, null);
+        this(idempotencyKey, amount, currency, status, sourceAccount, destinationAccount, TransactionType.TRANSFER, sourceAccount != null ? sourceAccount.getUser() : null, null, null);
     }
 
     public Transaction(String idempotencyKey,
@@ -88,6 +92,19 @@ public class Transaction {
                        TransactionType transactionType,
                        User initiatedByUser,
                        String description) {
+        this(idempotencyKey, amount, currency, status, sourceAccount, destinationAccount, transactionType, initiatedByUser, description, null);
+    }
+
+    public Transaction(String idempotencyKey,
+                       BigDecimal amount,
+                       String currency,
+                       TransactionStatus status,
+                       Account sourceAccount,
+                       Account destinationAccount,
+                       TransactionType transactionType,
+                       User initiatedByUser,
+                       String description,
+                       Transaction reversesTransaction) {
         this.idempotencyKey = idempotencyKey;
         this.amount = amount;
         this.currency = currency;
@@ -97,6 +114,7 @@ public class Transaction {
         this.transactionType = transactionType != null ? transactionType : TransactionType.TRANSFER;
         this.initiatedByUser = initiatedByUser != null ? initiatedByUser : (sourceAccount != null ? sourceAccount.getUser() : null);
         this.description = description;
+        this.reversesTransaction = reversesTransaction;
     }
 
     @PrePersist
@@ -168,6 +186,14 @@ public class Transaction {
         this.completedAt = completedAt;
     }
 
+    public Transaction getReversesTransaction() {
+        return reversesTransaction;
+    }
+
+    public UUID getReversesTransactionId() {
+        return reversesTransaction != null ? reversesTransaction.getId() : null;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -192,6 +218,7 @@ public class Transaction {
                 ", transactionType=" + transactionType +
                 ", initiatedByUserId=" + (initiatedByUser != null ? initiatedByUser.getId() : null) +
                 ", description='" + description + '\'' +
+                ", reversesTransactionId=" + (reversesTransaction != null ? reversesTransaction.getId() : null) +
                 ", sourceAccountId=" + (sourceAccount != null ? sourceAccount.getId() : null) +
                 ", destinationAccountId=" + (destinationAccount != null ? destinationAccount.getId() : null) +
                 ", createdAt=" + createdAt +

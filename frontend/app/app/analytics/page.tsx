@@ -346,6 +346,7 @@ function AnalyticsContent() {
             transfers={composition.transfers}
             deposits={composition.deposits}
             withdrawals={composition.withdrawals}
+            reversals={composition.reversals}
             total={composition.total}
             isLoading={isLoadingData}
           />
