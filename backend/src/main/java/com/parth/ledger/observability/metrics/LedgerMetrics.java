@@ -332,4 +332,120 @@ public class LedgerMetrics {
             log.warn("Failed to record HTTP request metric: {}", t.getMessage());
         }
     }
+
+    // =========================================================================
+    // 7. OUTBOX OBSERVABILITY METRICS
+    // =========================================================================
+
+    private static final Set<String> ALLOWED_OUTBOX_EVENT_TYPES = Set.of(
+            "TRANSFER_COMPLETED",
+            "DEPOSIT_COMPLETED",
+            "WITHDRAWAL_COMPLETED",
+            "TRANSACTION_REVERSED",
+            "ACCOUNT_CREATED",
+            "ACCOUNT_FROZEN",
+            "ACCOUNT_UNFROZEN",
+            "ACCOUNT_CLOSED"
+    );
+
+    public static String normalizeOutboxEventType(String eventType) {
+        if (eventType == null) {
+            return "UNKNOWN";
+        }
+        String upper = eventType.trim().toUpperCase(Locale.ROOT);
+        return ALLOWED_OUTBOX_EVENT_TYPES.contains(upper) ? upper : "UNKNOWN";
+    }
+
+    /**
+     * Records the creation of an outbox event.
+     * Guaranteed to only be called upon transaction commit.
+     *
+     * @param eventType Outbox event type.
+     */
+    public void recordOutboxEventCreated(String eventType) {
+        try {
+            Counter.builder("ledger.outbox.events.created.total")
+                    .description("Total outbox events created")
+                    .tag("event_type", normalizeOutboxEventType(eventType))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record outbox event created metric: {}", t.getMessage());
+        }
+    }
+
+    /**
+     * Records the processing outcome of an outbox event.
+     *
+     * @param eventType Outbox event type.
+     * @param outcome   One of "SUCCESS", "RETRY", "FAILED".
+     */
+    public void recordOutboxEventProcessed(String eventType, String outcome) {
+        try {
+            String safeOutcome = outcome != null ? outcome.trim().toUpperCase(Locale.ROOT) : "UNKNOWN";
+            Counter.builder("ledger.outbox.events.processed.total")
+                    .description("Total outbox events processed partitioned by outcome")
+                    .tag("event_type", normalizeOutboxEventType(eventType))
+                    .tag("outcome", safeOutcome)
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record outbox event processed metric: {}", t.getMessage());
+        }
+    }
+
+    /**
+     * Records an outbox event retry attempt.
+     *
+     * @param eventType Outbox event type.
+     */
+    public void recordOutboxEventRetried(String eventType) {
+        try {
+            Counter.builder("ledger.outbox.events.retried.total")
+                    .description("Total outbox events retried")
+                    .tag("event_type", normalizeOutboxEventType(eventType))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record outbox event retried metric: {}", t.getMessage());
+        }
+    }
+
+    /**
+     * Records an outbox event terminal failure.
+     *
+     * @param eventType Outbox event type.
+     */
+    public void recordOutboxEventFailed(String eventType) {
+        try {
+            Counter.builder("ledger.outbox.events.failed.total")
+                    .description("Total outbox events permanently failed")
+                    .tag("event_type", normalizeOutboxEventType(eventType))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record outbox event failed metric: {}", t.getMessage());
+        }
+    }
+
+    /**
+     * Records the execution latency of outbox event processing.
+     *
+     * @param eventType      Outbox event type.
+     * @param status         One of "SUCCESS", "FAILED".
+     * @param durationMillis Latency in milliseconds.
+     */
+    public void recordOutboxProcessingDuration(String eventType, String status, long durationMillis) {
+        try {
+            String safeStatus = status != null ? status.trim().toUpperCase(Locale.ROOT) : "UNKNOWN";
+            Timer.builder("ledger.outbox.processing.duration")
+                    .description("Duration of outbox event processing in milliseconds")
+                    .tag("event_type", normalizeOutboxEventType(eventType))
+                    .tag("status", safeStatus)
+                    .register(registry)
+                    .record(durationMillis, TimeUnit.MILLISECONDS);
+        } catch (Throwable t) {
+            log.warn("Failed to record outbox processing duration metric: {}", t.getMessage());
+        }
+    }
 }

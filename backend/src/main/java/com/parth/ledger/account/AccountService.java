@@ -30,13 +30,23 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
+    private final com.parth.ledger.outbox.OutboxService outboxService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AccountService(AccountRepository accountRepository,
+                          AuthenticatedUserService authenticatedUserService,
+                          com.parth.ledger.audit.AuditEventService auditEventService,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.outbox.OutboxService outboxService) {
+        this.accountRepository = accountRepository;
+        this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
+        this.outboxService = outboxService;
+    }
 
     public AccountService(AccountRepository accountRepository,
                           AuthenticatedUserService authenticatedUserService,
                           com.parth.ledger.audit.AuditEventService auditEventService) {
-        this.accountRepository = accountRepository;
-        this.authenticatedUserService = authenticatedUserService;
-        this.auditEventService = auditEventService;
+        this(accountRepository, authenticatedUserService, auditEventService, null);
     }
 
     /**
@@ -95,6 +105,21 @@ public class AccountService {
                         "accountNumber", saved.getAccountNumber()
                 )
         );
+
+        if (outboxService != null) {
+            outboxService.recordEvent(
+                    com.parth.ledger.outbox.OutboxAggregateType.ACCOUNT,
+                    saved.getId(),
+                    com.parth.ledger.outbox.OutboxEventType.ACCOUNT_CREATED,
+                    java.util.Map.of(
+                            "accountId", saved.getId(),
+                            "accountNumber", saved.getAccountNumber(),
+                            "accountType", saved.getAccountType().name(),
+                            "currency", saved.getCurrency(),
+                            "occurredAt", java.time.Instant.now().toString()
+                    )
+            );
+        }
 
         return AccountResponseDto.from(saved);
     }
@@ -203,6 +228,19 @@ public class AccountService {
                 java.util.Map.of("status", AccountStatus.FROZEN.name())
         );
 
+        if (outboxService != null) {
+            outboxService.recordEvent(
+                    com.parth.ledger.outbox.OutboxAggregateType.ACCOUNT,
+                    saved.getId(),
+                    com.parth.ledger.outbox.OutboxEventType.ACCOUNT_FROZEN,
+                    java.util.Map.of(
+                            "accountId", saved.getId(),
+                            "status", AccountStatus.FROZEN.name(),
+                            "occurredAt", java.time.Instant.now().toString()
+                    )
+            );
+        }
+
         return AccountResponseDto.from(saved);
     }
 
@@ -262,6 +300,19 @@ public class AccountService {
                 saved.getId(),
                 java.util.Map.of("status", AccountStatus.ACTIVE.name())
         );
+
+        if (outboxService != null) {
+            outboxService.recordEvent(
+                    com.parth.ledger.outbox.OutboxAggregateType.ACCOUNT,
+                    saved.getId(),
+                    com.parth.ledger.outbox.OutboxEventType.ACCOUNT_UNFROZEN,
+                    java.util.Map.of(
+                            "accountId", saved.getId(),
+                            "status", AccountStatus.ACTIVE.name(),
+                            "occurredAt", java.time.Instant.now().toString()
+                    )
+            );
+        }
 
         return AccountResponseDto.from(saved);
     }
@@ -325,6 +376,19 @@ public class AccountService {
                 saved.getId(),
                 java.util.Map.of("status", AccountStatus.CLOSED.name())
         );
+
+        if (outboxService != null) {
+            outboxService.recordEvent(
+                    com.parth.ledger.outbox.OutboxAggregateType.ACCOUNT,
+                    saved.getId(),
+                    com.parth.ledger.outbox.OutboxEventType.ACCOUNT_CLOSED,
+                    java.util.Map.of(
+                            "accountId", saved.getId(),
+                            "status", AccountStatus.CLOSED.name(),
+                            "occurredAt", java.time.Instant.now().toString()
+                    )
+            );
+        }
 
         return AccountResponseDto.from(saved);
     }

@@ -77,6 +77,7 @@ public class TransactionReversalService {
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
     private final AuditEventService auditEventService;
+    private final com.parth.ledger.outbox.OutboxService outboxService;
     private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -86,6 +87,7 @@ public class TransactionReversalService {
                                       IdempotencyCacheService idempotencyCacheService,
                                       AuthenticatedUserService authenticatedUserService,
                                       AuditEventService auditEventService,
+                                      @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.outbox.OutboxService outboxService,
                                       @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
@@ -93,6 +95,7 @@ public class TransactionReversalService {
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
+        this.outboxService = outboxService;
         this.ledgerMetrics = ledgerMetrics;
     }
 
@@ -101,8 +104,18 @@ public class TransactionReversalService {
                                       LedgerEntryRepository ledgerEntryRepository,
                                       IdempotencyCacheService idempotencyCacheService,
                                       AuthenticatedUserService authenticatedUserService,
+                                      AuditEventService auditEventService,
+                                      com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this(transactionRepository, accountRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, null, ledgerMetrics);
+    }
+
+    public TransactionReversalService(TransactionRepository transactionRepository,
+                                      AccountRepository accountRepository,
+                                      LedgerEntryRepository ledgerEntryRepository,
+                                      IdempotencyCacheService idempotencyCacheService,
+                                      AuthenticatedUserService authenticatedUserService,
                                       AuditEventService auditEventService) {
-        this(transactionRepository, accountRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, null);
+        this(transactionRepository, accountRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, null, null);
     }
 
     /**
@@ -388,6 +401,25 @@ public class TransactionReversalService {
                             "reason", cleanReason != null ? cleanReason : ""
                     )
             );
+
+            // 13.5. Record TRANSACTION_REVERSED transactional outbox event atomically in PostgreSQL transaction
+            if (outboxService != null) {
+                outboxService.recordEvent(
+                        com.parth.ledger.outbox.OutboxAggregateType.TRANSACTION,
+                        reversalTx.getId(),
+                        com.parth.ledger.outbox.OutboxEventType.TRANSACTION_REVERSED,
+                        Map.of(
+                                "transactionId", reversalTx.getId(),
+                                "reversesTransactionId", originalTransactionId,
+                                "originalTransactionType", originalTx.getTransactionType().name(),
+                                "sourceAccountId", reversalDebitAccount.getId(),
+                                "destinationAccountId", reversalCreditAccount.getId(),
+                                "amount", amount,
+                                "currency", currency,
+                                "occurredAt", reversalTx.getCompletedAt().toString()
+                        )
+                );
+            }
 
             log.info("Successfully executed transaction reversal: reversalTxId={}, originalTxId={}, amount={} {}, debitedAccount={}, creditedAccount={}",
                     MaskingUtils.maskAccountId(reversalTx.getId()),

@@ -68,6 +68,7 @@ public class DepositService {
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
     private final com.parth.ledger.policy.PolicyService policyService;
+    private final com.parth.ledger.outbox.OutboxService outboxService;
     private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -78,6 +79,7 @@ public class DepositService {
                           AuthenticatedUserService authenticatedUserService,
                           com.parth.ledger.audit.AuditEventService auditEventService,
                           com.parth.ledger.policy.PolicyService policyService,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.outbox.OutboxService outboxService,
                           @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
@@ -86,6 +88,7 @@ public class DepositService {
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
         this.policyService = policyService;
+        this.outboxService = outboxService;
         this.ledgerMetrics = ledgerMetrics;
     }
 
@@ -95,8 +98,19 @@ public class DepositService {
                           IdempotencyCacheService idempotencyCacheService,
                           AuthenticatedUserService authenticatedUserService,
                           com.parth.ledger.audit.AuditEventService auditEventService,
+                          com.parth.ledger.policy.PolicyService policyService,
+                          com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null, ledgerMetrics);
+    }
+
+    public DepositService(AccountRepository accountRepository,
+                          TransactionRepository transactionRepository,
+                          LedgerEntryRepository ledgerEntryRepository,
+                          IdempotencyCacheService idempotencyCacheService,
+                          AuthenticatedUserService authenticatedUserService,
+                          com.parth.ledger.audit.AuditEventService auditEventService,
                           com.parth.ledger.policy.PolicyService policyService) {
-        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null);
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null, null);
     }
 
     /**
@@ -413,6 +427,22 @@ public class DepositService {
                             "destinationAccountId", destinationId
                     )
             );
+
+            // 18.5. Record DEPOSIT_COMPLETED transactional outbox event atomically within PostgreSQL transaction
+            if (outboxService != null) {
+                outboxService.recordEvent(
+                        com.parth.ledger.outbox.OutboxAggregateType.TRANSACTION,
+                        transaction.getId(),
+                        com.parth.ledger.outbox.OutboxEventType.DEPOSIT_COMPLETED,
+                        java.util.Map.of(
+                                "transactionId", transaction.getId(),
+                                "destinationAccountId", destinationId,
+                                "amount", scaledAmount,
+                                "currency", currency,
+                                "occurredAt", transaction.getCompletedAt().toString()
+                        )
+                );
+            }
 
             log.info("Successfully executed deposit: txId={}, amount={} {}, clearing={} to userAccount={}",
                     com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(transaction.getId()), scaledAmount, currency,

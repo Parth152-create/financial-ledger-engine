@@ -55,6 +55,7 @@ public class WithdrawalService {
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
     private final com.parth.ledger.policy.PolicyService policyService;
+    private final com.parth.ledger.outbox.OutboxService outboxService;
     private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -65,6 +66,7 @@ public class WithdrawalService {
                              AuthenticatedUserService authenticatedUserService,
                              com.parth.ledger.audit.AuditEventService auditEventService,
                              com.parth.ledger.policy.PolicyService policyService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.outbox.OutboxService outboxService,
                              @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
@@ -73,6 +75,7 @@ public class WithdrawalService {
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
         this.policyService = policyService;
+        this.outboxService = outboxService;
         this.ledgerMetrics = ledgerMetrics;
     }
 
@@ -82,8 +85,19 @@ public class WithdrawalService {
                              IdempotencyCacheService idempotencyCacheService,
                              AuthenticatedUserService authenticatedUserService,
                              com.parth.ledger.audit.AuditEventService auditEventService,
+                             com.parth.ledger.policy.PolicyService policyService,
+                             com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null, ledgerMetrics);
+    }
+
+    public WithdrawalService(AccountRepository accountRepository,
+                             TransactionRepository transactionRepository,
+                             LedgerEntryRepository ledgerEntryRepository,
+                             IdempotencyCacheService idempotencyCacheService,
+                             AuthenticatedUserService authenticatedUserService,
+                             com.parth.ledger.audit.AuditEventService auditEventService,
                              com.parth.ledger.policy.PolicyService policyService) {
-        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null);
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null, null);
     }
 
     @Transactional
@@ -348,6 +362,22 @@ public class WithdrawalService {
                             "sourceAccountId", sourceId
                     )
             );
+
+            // Record WITHDRAWAL_COMPLETED transactional outbox event atomically within PostgreSQL transaction
+            if (outboxService != null) {
+                outboxService.recordEvent(
+                        com.parth.ledger.outbox.OutboxAggregateType.TRANSACTION,
+                        transaction.getId(),
+                        com.parth.ledger.outbox.OutboxEventType.WITHDRAWAL_COMPLETED,
+                        java.util.Map.of(
+                                "transactionId", transaction.getId(),
+                                "sourceAccountId", sourceId,
+                                "amount", scaledAmount,
+                                "currency", currency,
+                                "occurredAt", transaction.getCompletedAt().toString()
+                        )
+                );
+            }
 
             log.info("Successfully executed withdrawal: txId={}, amount={} {}, userAccount={} to clearing={}",
                     com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(transaction.getId()), scaledAmount, currency,

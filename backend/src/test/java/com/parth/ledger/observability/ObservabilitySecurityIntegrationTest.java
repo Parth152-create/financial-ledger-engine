@@ -60,7 +60,8 @@ class ObservabilitySecurityIntegrationTest extends BaseIntegrationTest {
             "uri",
             "endpoint",
             "status_group",
-            "exception"
+            "exception",
+            "event_type"
     );
 
     @Autowired

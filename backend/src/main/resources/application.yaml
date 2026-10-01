@@ -54,6 +54,14 @@ spring:
 ledger:
   frontend-url: ${FRONTEND_URL:http://localhost:3001}
 
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: ${OUTBOX_BATCH_SIZE:20}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    base-delay-seconds: ${OUTBOX_BASE_DELAY_SECONDS:2}
+    max-delay-seconds: ${OUTBOX_MAX_DELAY_SECONDS:300}
+
   idempotency:
     ttl-seconds: ${LEDGER_IDEMPOTENCY_TTL_SECONDS:86400}
 
