@@ -31,5 +31,11 @@ public enum AuditEventType {
     // Financial transaction policy rejection events
     TRANSFER_REJECTED_POLICY,
     DEPOSIT_REJECTED_POLICY,
-    WITHDRAWAL_REJECTED_POLICY
+    WITHDRAWAL_REJECTED_POLICY,
+
+    // Recurring transfer lifecycle events
+    RECURRING_TRANSFER_CREATED,
+    RECURRING_TRANSFER_PAUSED,
+    RECURRING_TRANSFER_RESUMED,
+    RECURRING_TRANSFER_CANCELLED
 }

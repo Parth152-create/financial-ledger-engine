@@ -48,6 +48,8 @@ public abstract class BaseIntegrationTest {
     void truncateTablesBeforeEach() {
         if (jdbcTemplate != null) {
             try {
+                jdbcTemplate.execute("TRUNCATE TABLE recurring_transfer_executions CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE recurring_transfers CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE outbox_events CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");
@@ -62,6 +64,8 @@ public abstract class BaseIntegrationTest {
     void truncateTablesAfterEach() {
         if (jdbcTemplate != null) {
             try {
+                jdbcTemplate.execute("TRUNCATE TABLE recurring_transfer_executions CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE recurring_transfers CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE outbox_events CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");

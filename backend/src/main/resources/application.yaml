@@ -62,6 +62,11 @@ ledger:
     base-delay-seconds: ${OUTBOX_BASE_DELAY_SECONDS:2}
     max-delay-seconds: ${OUTBOX_MAX_DELAY_SECONDS:300}
 
+  recurring-transfers:
+    enabled: ${RECURRING_TRANSFERS_ENABLED:true}
+    poll-interval-ms: ${RECURRING_TRANSFERS_POLL_INTERVAL_MS:5000}
+    batch-size: ${RECURRING_TRANSFERS_BATCH_SIZE:20}
+
   idempotency:
     ttl-seconds: ${LEDGER_IDEMPOTENCY_TTL_SECONDS:86400}
 

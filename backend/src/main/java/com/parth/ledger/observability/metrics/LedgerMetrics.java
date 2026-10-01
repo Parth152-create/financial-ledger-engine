@@ -448,4 +448,82 @@ public class LedgerMetrics {
             log.warn("Failed to record outbox processing duration metric: {}", t.getMessage());
         }
     }
+
+    // =========================================================================
+    // 8. RECURRING TRANSFER OBSERVABILITY METRICS
+    // =========================================================================
+
+    private static final Set<String> ALLOWED_FREQUENCIES = Set.of("DAILY", "WEEKLY", "MONTHLY");
+
+    public static String normalizeFrequency(String frequency) {
+        if (frequency == null) {
+            return "UNKNOWN";
+        }
+        String upper = frequency.trim().toUpperCase(Locale.ROOT);
+        return ALLOWED_FREQUENCIES.contains(upper) ? upper : "UNKNOWN";
+    }
+
+    public void recordRecurringTransferCreated(String frequency) {
+        try {
+            Counter.builder("ledger.recurring_transfers.created")
+                    .description("Total recurring transfers created")
+                    .tag("frequency", normalizeFrequency(frequency))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record recurring transfer created metric: {}", t.getMessage());
+        }
+    }
+
+    public void recordRecurringTransferExecuted(String frequency, String outcome) {
+        try {
+            String safeOutcome = outcome != null ? outcome.trim().toUpperCase(Locale.ROOT) : "UNKNOWN";
+            Counter.builder("ledger.recurring_transfers.executed")
+                    .description("Total recurring transfer executions partitioned by outcome")
+                    .tag("frequency", normalizeFrequency(frequency))
+                    .tag("outcome", safeOutcome)
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record recurring transfer executed metric: {}", t.getMessage());
+        }
+    }
+
+    public void recordRecurringTransferFailed(String frequency) {
+        try {
+            Counter.builder("ledger.recurring_transfers.failed")
+                    .description("Total failed recurring transfer executions")
+                    .tag("frequency", normalizeFrequency(frequency))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record recurring transfer failed metric: {}", t.getMessage());
+        }
+    }
+
+    public void recordRecurringTransferCancelled(String frequency) {
+        try {
+            Counter.builder("ledger.recurring_transfers.cancelled")
+                    .description("Total recurring transfers cancelled")
+                    .tag("frequency", normalizeFrequency(frequency))
+                    .register(registry)
+                    .increment();
+        } catch (Throwable t) {
+            log.warn("Failed to record recurring transfer cancelled metric: {}", t.getMessage());
+        }
+    }
+
+    public void recordRecurringProcessingDuration(String frequency, String status, long durationMillis) {
+        try {
+            String safeStatus = status != null ? status.trim().toUpperCase(Locale.ROOT) : "UNKNOWN";
+            Timer.builder("ledger.recurring_transfers.processing.duration")
+                    .description("Duration of recurring transfer execution in milliseconds")
+                    .tag("frequency", normalizeFrequency(frequency))
+                    .tag("status", safeStatus)
+                    .register(registry)
+                    .record(durationMillis, TimeUnit.MILLISECONDS);
+        } catch (Throwable t) {
+            log.warn("Failed to record recurring transfer processing duration metric: {}", t.getMessage());
+        }
+    }
 }

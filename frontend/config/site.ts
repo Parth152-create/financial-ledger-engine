@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Landmark,
   ArrowLeftRight,
+  CalendarClock,
   BookOpenText,
   BarChart3,
   Scale,
@@ -41,6 +42,12 @@ export const SITE_CONFIG = {
       title: "Transfers",
       href: ROUTES.TRANSFERS,
       icon: ArrowLeftRight,
+      section: "Operations",
+    },
+    {
+      title: "Recurring Transfers",
+      href: ROUTES.RECURRING_TRANSFERS,
+      icon: CalendarClock,
       section: "Operations",
     },
     {

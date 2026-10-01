@@ -114,7 +114,7 @@ public class TransferService {
      * @param request Transfer request parameters.
      * @return TransferResponseDto containing completed transaction details.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public TransferResponseDto executeTransfer(String idempotencyKey, TransferRequestDto request) {
         long startTime = System.currentTimeMillis();
 

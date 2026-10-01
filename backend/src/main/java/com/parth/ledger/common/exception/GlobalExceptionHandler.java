@@ -141,6 +141,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(com.parth.ledger.recurring.RecurringTransferNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRecurringTransferNotFound(com.parth.ledger.recurring.RecurringTransferNotFoundException ex, HttpServletRequest request) {
+        log.warn("Recurring transfer not found on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(com.parth.ledger.recurring.RecurringTransferStatusException.class)
+    public ResponseEntity<ErrorResponse> handleRecurringTransferStatus(com.parth.ledger.recurring.RecurringTransferStatusException ex, HttpServletRequest request) {
+        log.warn("Recurring transfer invalid status transition on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex, HttpServletRequest request) {
         log.warn("Insufficient balance for requested operation on path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));

@@ -8,5 +8,6 @@ public enum AuditEntityType {
     ACCOUNT,
     TRANSACTION,
     SYSTEM,
-    POLICY
+    POLICY,
+    RECURRING_TRANSFER
 }

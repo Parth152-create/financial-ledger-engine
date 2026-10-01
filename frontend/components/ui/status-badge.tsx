@@ -3,10 +3,13 @@ import { cn } from "@/lib/utils"
 
 export type FinancialStatus =
   | "ACTIVE"
+  | "PAUSED"
+  | "CANCELLED"
   | "FROZEN"
   | "CLOSED"
   | "COMPLETED"
   | "PENDING"
+  | "SUCCESS"
   | "FAILED"
   | "CONSISTENT"
   | "DISCREPANCY"
@@ -23,6 +26,27 @@ const STATUS_CONFIG: Record<
 > = {
   ACTIVE: {
     label: "Active",
+    dot: "bg-emerald-500",
+    text: "text-emerald-700 dark:text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+  },
+  PAUSED: {
+    label: "Paused",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
+  CANCELLED: {
+    label: "Cancelled",
+    dot: "bg-muted-foreground/60",
+    text: "text-muted-foreground",
+    bg: "bg-muted/50",
+    border: "border-border",
+  },
+  SUCCESS: {
+    label: "Success",
     dot: "bg-emerald-500",
     text: "text-emerald-700 dark:text-emerald-400",
     bg: "bg-emerald-500/10",

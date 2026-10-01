@@ -14,6 +14,7 @@ export const ROUTES = {
   AUDIT: "/app/audit",
   SETTINGS: "/app/settings",
   SETTINGS_POLICIES: "/app/settings/policies",
+  RECURRING_TRANSFERS: "/app/recurring-transfers",
 } as const
 
 export const API_ROUTES = {
@@ -40,4 +41,10 @@ export const API_ROUTES = {
   ACCOUNT_LIMITS: (id: string) => `/api/v1/accounts/${id}/limits`,
   ADMIN_POLICIES: "/api/v1/admin/policies",
   ADMIN_POLICY_BY_ID: (id: string) => `/api/v1/admin/policies/${id}`,
+  RECURRING_TRANSFERS: "/api/v1/recurring-transfers",
+  RECURRING_TRANSFER_BY_ID: (id: string) => `/api/v1/recurring-transfers/${id}`,
+  RECURRING_TRANSFER_PAUSE: (id: string) => `/api/v1/recurring-transfers/${id}/pause`,
+  RECURRING_TRANSFER_RESUME: (id: string) => `/api/v1/recurring-transfers/${id}/resume`,
+  RECURRING_TRANSFER_CANCEL: (id: string) => `/api/v1/recurring-transfers/${id}/cancel`,
+  RECURRING_TRANSFER_EXECUTIONS: (id: string) => `/api/v1/recurring-transfers/${id}/executions`,
 } as const
