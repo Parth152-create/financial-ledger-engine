@@ -11,8 +11,14 @@ export type AuditEventType =
   | "DEPOSIT_COMPLETED"
   | "WITHDRAWAL_COMPLETED"
   | "TRANSACTION_REVERSED"
+  | "POLICY_CREATED"
+  | "POLICY_UPDATED"
+  | "POLICY_DELETED"
+  | "TRANSFER_REJECTED_POLICY"
+  | "DEPOSIT_REJECTED_POLICY"
+  | "WITHDRAWAL_REJECTED_POLICY"
 
-export type AuditEntityType = "USER" | "ACCOUNT" | "TRANSACTION" | "SYSTEM"
+export type AuditEntityType = "USER" | "ACCOUNT" | "TRANSACTION" | "SYSTEM" | "POLICY"
 
 export interface AuditEvent {
   id: string

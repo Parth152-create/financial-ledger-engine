@@ -67,19 +67,22 @@ public class DepositService {
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
+    private final com.parth.ledger.policy.PolicyService policyService;
 
     public DepositService(AccountRepository accountRepository,
                           TransactionRepository transactionRepository,
                           LedgerEntryRepository ledgerEntryRepository,
                           IdempotencyCacheService idempotencyCacheService,
                           AuthenticatedUserService authenticatedUserService,
-                          com.parth.ledger.audit.AuditEventService auditEventService) {
+                          com.parth.ledger.audit.AuditEventService auditEventService,
+                          com.parth.ledger.policy.PolicyService policyService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
+        this.policyService = policyService;
     }
 
     /**
@@ -284,6 +287,32 @@ public class DepositService {
                     "Insufficient balance in system clearing account: available "
                             + lockedClearingAccount.getBalance() + ", required " + scaledAmount
             );
+        }
+
+        // 12.5. Policy Engine Evaluation: Max deposit amount, daily deposit amount, daily deposit count, resulting balance limit
+        try {
+            policyService.evaluateAndRecordDepositLimits(lockedDestinationAccount, scaledAmount);
+        } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+            try {
+                auditEventService.recordPolicyRejectionEventOnce(
+                        authenticatedUser != null ? authenticatedUser.getId() : null,
+                        com.parth.ledger.audit.AuditEventType.DEPOSIT_REJECTED_POLICY,
+                        com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                        destinationId,
+                        cleanIdempotencyKey,
+                        "DEPOSIT",
+                        java.util.Map.of(
+                                "policyType", ex.getErrorCode().name(),
+                                "reason", ex.getMessage(),
+                                "amount", scaledAmount,
+                                "currency", currency,
+                                "destinationAccountId", destinationId
+                        )
+                );
+            } catch (Exception auditErr) {
+                log.warn("Failed to record DEPOSIT_REJECTED_POLICY audit event: {}", auditErr.getMessage());
+            }
+            throw ex;
         }
 
         // 13. Financial Mutation: Debit SYSTEM_CLEARING and Credit USER_CHECKING

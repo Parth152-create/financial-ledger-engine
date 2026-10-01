@@ -12,13 +12,18 @@ public record ErrorResponse(
         String error,
         String message,
         String path,
-        List<String> details
+        List<String> details,
+        String code
 ) {
     public ErrorResponse(int status, String error, String message, String path) {
-        this(Instant.now(), status, error, message, path, null);
+        this(Instant.now(), status, error, message, path, null, null);
     }
 
     public ErrorResponse(int status, String error, String message, String path, List<String> details) {
-        this(Instant.now(), status, error, message, path, details);
+        this(Instant.now(), status, error, message, path, details, null);
+    }
+
+    public ErrorResponse(int status, String error, String message, String path, String code) {
+        this(Instant.now(), status, error, message, path, null, code);
     }
 }

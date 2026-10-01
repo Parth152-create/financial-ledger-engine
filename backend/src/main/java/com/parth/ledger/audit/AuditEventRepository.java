@@ -46,4 +46,16 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID>, J
     java.util.List<AuditEvent> findByEventType(
             AuditEventType eventType
     );
+
+    /**
+     * Checks if a policy rejection audit event already exists for a given event type and correlation ID.
+     */
+    @org.springframework.data.jpa.repository.Query(
+            value = "SELECT COUNT(*) > 0 FROM audit_events WHERE event_type = :eventType AND metadata ->> 'correlationId' = :correlationId",
+            nativeQuery = true
+    )
+    boolean existsByEventTypeAndCorrelationId(
+            @org.springframework.data.repository.query.Param("eventType") String eventType,
+            @org.springframework.data.repository.query.Param("correlationId") String correlationId
+    );
 }

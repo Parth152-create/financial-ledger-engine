@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
@@ -58,13 +59,23 @@ public class AuditEventService {
     private final AuditEventRepository auditEventRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final ClientIpResolver clientIpResolver;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuditEventService(AuditEventRepository auditEventRepository,
+                             AuthenticatedUserService authenticatedUserService,
+                             ClientIpResolver clientIpResolver,
+                             org.springframework.transaction.PlatformTransactionManager transactionManager) {
+        this.auditEventRepository = auditEventRepository;
+        this.authenticatedUserService = authenticatedUserService;
+        this.clientIpResolver = clientIpResolver;
+        this.transactionManager = transactionManager;
+    }
 
     public AuditEventService(AuditEventRepository auditEventRepository,
                              AuthenticatedUserService authenticatedUserService,
                              ClientIpResolver clientIpResolver) {
-        this.auditEventRepository = auditEventRepository;
-        this.authenticatedUserService = authenticatedUserService;
-        this.clientIpResolver = clientIpResolver;
+        this(auditEventRepository, authenticatedUserService, clientIpResolver, null);
     }
 
     /**
@@ -121,6 +132,135 @@ public class AuditEventService {
         log.debug("Recorded audit event: id={}, eventType={}, entityType={}, entityId={}, actorUserId={}",
                 saved.getId(), eventType, entityType, entityId, actorUserId);
         return saved;
+    }
+
+    /**
+     * Records an operational audit event in a guaranteed independent, new database transaction (REQUIRES_NEW).
+     * Used for recording failure/rejection events that must persist even if the outer financial transaction rolls back.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public AuditEvent recordEventInNewTransaction(UUID actorUserId,
+                                                  AuditEventType eventType,
+                                                  AuditEntityType entityType,
+                                                  UUID entityId,
+                                                  Map<String, Object> metadata) {
+        return recordEvent(actorUserId, eventType, entityType, entityId, metadata);
+    }
+
+    /**
+     * Records an operational policy rejection audit event at most once per logical request fingerprint.
+     * Subsequent idempotent retries with the same logical payload are deduplicated, while materially different
+     * requests reusing the same idempotency key produce distinct audit events.
+     * Derives an internal correlation ID deterministically without exposing raw secrets or idempotency keys.
+     * Database-enforced deduplication backed by partial unique index uk_audit_events_policy_rejection_correlation.
+     */
+    public void recordPolicyRejectionEventOnce(UUID actorUserId,
+                                              AuditEventType eventType,
+                                              AuditEntityType entityType,
+                                              UUID entityId,
+                                              String idempotencyKey,
+                                              String transactionType,
+                                              Map<String, Object> metadata) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            recordEventInNewTransaction(actorUserId, eventType, entityType, entityId, metadata);
+            return;
+        }
+
+        // Deterministic request fingerprint derived from normalized request payload
+        String correlationId = computeRejectionFingerprint(transactionType, idempotencyKey, metadata);
+
+        Map<String, Object> enrichedMetadata = new HashMap<>(metadata != null ? metadata : Collections.emptyMap());
+        enrichedMetadata.put("correlationId", correlationId);
+        // Explicitly guarantee raw idempotency key or secrets are NEVER leaked into audit metadata
+        enrichedMetadata.remove("idempotencyKey");
+        enrichedMetadata.remove("cleanIdempotencyKey");
+        enrichedMetadata.remove("key");
+
+        if (transactionManager != null) {
+            org.springframework.transaction.support.TransactionTemplate txTemplate =
+                    new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+            txTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            try {
+                txTemplate.execute(status -> {
+                    if (auditEventRepository.existsByEventTypeAndCorrelationId(eventType.name(), correlationId)) {
+                        log.debug("Skipping duplicate policy rejection audit event for correlationId={}, eventType={}", correlationId, eventType);
+                        return null;
+                    }
+                    try {
+                        recordEvent(actorUserId, eventType, entityType, entityId, enrichedMetadata);
+                        auditEventRepository.flush();
+                    } catch (org.springframework.dao.DataIntegrityViolationException dive) {
+                        log.debug("Concurrent duplicate policy rejection audit event suppressed by DB unique index: correlationId={}", correlationId);
+                        status.setRollbackOnly();
+                    }
+                    return null;
+                });
+            } catch (Exception e) {
+                log.debug("Policy rejection audit event transaction completed with rollback or suppression: {}", e.getMessage());
+            }
+        } else {
+            // Fallback for standalone/mock unit test contexts
+            if (auditEventRepository.existsByEventTypeAndCorrelationId(eventType.name(), correlationId)) {
+                log.debug("Skipping duplicate policy rejection audit event for correlationId={}, eventType={}", correlationId, eventType);
+                return;
+            }
+            recordEvent(actorUserId, eventType, entityType, entityId, enrichedMetadata);
+        }
+    }
+
+    /**
+     * Computes a deterministic request fingerprint from normalized request fields.
+     * Ensures identical retries map to the same correlationId, while materially different payloads
+     * reusing the same idempotency key map to distinct correlation IDs.
+     */
+    public static String computeRejectionFingerprint(String transactionType,
+                                                    String idempotencyKey,
+                                                    Map<String, Object> metadata) {
+        String cleanType = transactionType != null ? transactionType.trim().toUpperCase() : "UNKNOWN";
+        String cleanKey = idempotencyKey != null ? idempotencyKey.trim() : "";
+        StringBuilder sb = new StringBuilder();
+        sb.append("policy-rejection:").append(cleanType).append(':').append(cleanKey);
+
+        if (metadata != null) {
+            if ("TRANSFER".equals(cleanType)) {
+                Object src = metadata.get("sourceAccountId");
+                Object dst = metadata.get("destinationAccountId");
+                Object amt = metadata.get("amount");
+                Object cur = metadata.get("currency");
+                sb.append(":src=").append(src != null ? src.toString().trim().toLowerCase() : "");
+                sb.append(":dst=").append(dst != null ? dst.toString().trim().toLowerCase() : "");
+                sb.append(":amt=").append(normalizeAmount(amt));
+                sb.append(":cur=").append(cur != null ? cur.toString().trim().toUpperCase() : "");
+            } else if ("DEPOSIT".equals(cleanType)) {
+                Object dst = metadata.get("destinationAccountId");
+                Object amt = metadata.get("amount");
+                Object cur = metadata.get("currency");
+                sb.append(":acct=").append(dst != null ? dst.toString().trim().toLowerCase() : "");
+                sb.append(":amt=").append(normalizeAmount(amt));
+                sb.append(":cur=").append(cur != null ? cur.toString().trim().toUpperCase() : "");
+            } else if ("WITHDRAWAL".equals(cleanType)) {
+                Object src = metadata.get("sourceAccountId");
+                Object amt = metadata.get("amount");
+                Object cur = metadata.get("currency");
+                sb.append(":acct=").append(src != null ? src.toString().trim().toLowerCase() : "");
+                sb.append(":amt=").append(normalizeAmount(amt));
+                sb.append(":cur=").append(cur != null ? cur.toString().trim().toUpperCase() : "");
+            }
+        }
+
+        return UUID.nameUUIDFromBytes(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+    }
+
+    private static String normalizeAmount(Object amt) {
+        if (amt == null) return "0.0000";
+        if (amt instanceof BigDecimal bd) {
+            return bd.setScale(4, java.math.RoundingMode.HALF_UP).toPlainString();
+        }
+        try {
+            return new BigDecimal(amt.toString().trim()).setScale(4, java.math.RoundingMode.HALF_UP).toPlainString();
+        } catch (Exception e) {
+            return amt.toString().trim();
+        }
     }
 
     /**

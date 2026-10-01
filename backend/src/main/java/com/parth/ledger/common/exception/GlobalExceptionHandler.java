@@ -89,6 +89,45 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
     }
 
+    @ExceptionHandler(com.parth.ledger.policy.PolicyViolationException.class)
+    public ResponseEntity<ErrorResponse> handlePolicyViolation(com.parth.ledger.policy.PolicyViolationException ex, HttpServletRequest request) {
+        log.warn("Policy violation on {}: code={}, message={}", request.getRequestURI(), ex.getErrorCode(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                java.time.Instant.now(),
+                HttpStatus.UNPROCESSABLE_CONTENT.value(),
+                HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                ex.getErrorCode().name()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
+    }
+
+    @ExceptionHandler(com.parth.ledger.policy.DuplicatePolicyException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicatePolicy(com.parth.ledger.policy.DuplicatePolicyException ex, HttpServletRequest request) {
+        log.warn("Duplicate policy definition on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(com.parth.ledger.policy.PolicyNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePolicyNotFound(com.parth.ledger.policy.PolicyNotFoundException ex, HttpServletRequest request) {
+        log.warn("Policy not found on {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex, HttpServletRequest request) {
         log.warn("Insufficient balance: {}", ex.getMessage());

@@ -107,6 +107,54 @@ export const EVENT_TYPE_CONFIG: Record<AuditEventType, EventTypeConfig> = {
     bg: "bg-amber-500/10",
     border: "border-amber-500/20",
   },
+  POLICY_CREATED: {
+    label: "Policy Created",
+    category: "system",
+    dot: "bg-blue-500",
+    text: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/20",
+  },
+  POLICY_UPDATED: {
+    label: "Policy Updated",
+    category: "system",
+    dot: "bg-indigo-500",
+    text: "text-indigo-700 dark:text-indigo-400",
+    bg: "bg-indigo-500/10",
+    border: "border-indigo-500/20",
+  },
+  POLICY_DELETED: {
+    label: "Policy Deleted",
+    category: "system",
+    dot: "bg-rose-500",
+    text: "text-rose-700 dark:text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/20",
+  },
+  TRANSFER_REJECTED_POLICY: {
+    label: "Transfer Rejected",
+    category: "financial",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
+  DEPOSIT_REJECTED_POLICY: {
+    label: "Deposit Rejected",
+    category: "financial",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
+  WITHDRAWAL_REJECTED_POLICY: {
+    label: "Withdrawal Rejected",
+    category: "financial",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
 }
 
 export function getEventTypeConfig(type: string): EventTypeConfig {
@@ -133,6 +181,8 @@ export function formatEntityLabel(type: AuditEntityType | string): string {
       return "Transaction"
     case "SYSTEM":
       return "System"
+    case "POLICY":
+      return "Policy"
     default:
       return type
   }
@@ -180,6 +230,29 @@ export function formatEventSummary(event: AuditEvent): string {
       return "User logged out"
     case "PASSWORD_CHANGED":
       return "Account credentials updated"
+    case "POLICY_CREATED": {
+      const pType = (meta.policyType as string) || "Policy"
+      const scope = (meta.scope as string) || "GLOBAL"
+      return `Created ${scope} policy (${pType})`
+    }
+    case "POLICY_UPDATED": {
+      const pType = (meta.policyType as string) || "Policy"
+      return `Updated policy (${pType})`
+    }
+    case "POLICY_DELETED":
+      return "Deleted financial policy"
+    case "TRANSFER_REJECTED_POLICY": {
+      const reason = (meta.reason as string) || "Policy limit exceeded"
+      return `Transfer blocked: ${reason}`
+    }
+    case "DEPOSIT_REJECTED_POLICY": {
+      const reason = (meta.reason as string) || "Policy limit exceeded"
+      return `Deposit blocked: ${reason}`
+    }
+    case "WITHDRAWAL_REJECTED_POLICY": {
+      const reason = (meta.reason as string) || "Policy limit exceeded"
+      return `Withdrawal blocked: ${reason}`
+    }
     default:
       return String(event.eventType).replace(/_/g, " ").toLowerCase()
   }

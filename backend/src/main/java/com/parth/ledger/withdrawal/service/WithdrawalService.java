@@ -54,19 +54,22 @@ public class WithdrawalService {
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
+    private final com.parth.ledger.policy.PolicyService policyService;
 
     public WithdrawalService(AccountRepository accountRepository,
                              TransactionRepository transactionRepository,
                              LedgerEntryRepository ledgerEntryRepository,
                              IdempotencyCacheService idempotencyCacheService,
                              AuthenticatedUserService authenticatedUserService,
-                             com.parth.ledger.audit.AuditEventService auditEventService) {
+                             com.parth.ledger.audit.AuditEventService auditEventService,
+                             com.parth.ledger.policy.PolicyService policyService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
+        this.policyService = policyService;
     }
 
     @Transactional
@@ -218,6 +221,32 @@ public class WithdrawalService {
                     "Insufficient balance in source account: available "
                             + lockedSourceAccount.getBalance() + ", required " + scaledAmount
             );
+        }
+
+        // Policy Engine Evaluation: Max withdrawal amount, daily withdrawal amount, daily withdrawal count
+        try {
+            policyService.evaluateAndRecordWithdrawalLimits(lockedSourceAccount, scaledAmount);
+        } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+            try {
+                auditEventService.recordPolicyRejectionEventOnce(
+                        authenticatedUser != null ? authenticatedUser.getId() : null,
+                        com.parth.ledger.audit.AuditEventType.WITHDRAWAL_REJECTED_POLICY,
+                        com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                        sourceId,
+                        cleanIdempotencyKey,
+                        "WITHDRAWAL",
+                        java.util.Map.of(
+                                "policyType", ex.getErrorCode().name(),
+                                "reason", ex.getMessage(),
+                                "amount", scaledAmount,
+                                "currency", currency,
+                                "sourceAccountId", sourceId
+                        )
+                );
+            } catch (Exception auditErr) {
+                log.warn("Failed to record WITHDRAWAL_REJECTED_POLICY audit event: {}", auditErr.getMessage());
+            }
+            throw ex;
         }
 
         lockedSourceAccount.setBalance(lockedSourceAccount.getBalance().subtract(scaledAmount));

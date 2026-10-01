@@ -6,6 +6,7 @@ export interface ApiErrorResponse {
   path?: string
   details?: string[] | null
   retryAfter?: number | null
+  code?: string
 }
 
 export class ApiError extends Error {
@@ -14,6 +15,7 @@ export class ApiError extends Error {
   readonly details?: string[] | null
   readonly path?: string
   readonly retryAfter?: number | null
+  readonly code?: string
 
   constructor(data: ApiErrorResponse) {
     super(data.message || data.error || "An unexpected error occurred")
@@ -23,5 +25,6 @@ export class ApiError extends Error {
     this.details = data.details
     this.path = data.path
     this.retryAfter = data.retryAfter ?? null
+    this.code = data.code
   }
 }

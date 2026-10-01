@@ -12,6 +12,8 @@ import {
   type TransferFormValues,
 } from "@/lib/validators/transfer"
 import { useExecuteTransfer } from "@/hooks/api/use-transfers"
+import { useAccountLimit } from "@/hooks/api/use-accounts"
+import { formatINR } from "@/lib/formatters/currency"
 import type { Account } from "@/types/account"
 import type { TransferResponse } from "@/types/transaction"
 
@@ -49,6 +51,9 @@ export function TransferForm({
 
   // Execution mutation
   const executeTransferMutation = useExecuteTransfer()
+
+  // Account Limits query for source account
+  const { data: sourceLimits } = useAccountLimit(values.sourceAccountId, "TRANSFER")
 
   // Resolved accounts
   const selectedSourceAccount = React.useMemo(() => {
@@ -304,6 +309,17 @@ export function TransferForm({
           >
             {errors.amount}
           </p>
+        )}
+
+        {sourceLimits && (
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono pt-1">
+            {sourceLimits.maxTransactionAmount != null && (
+              <span>Max tx: {formatINR(sourceLimits.maxTransactionAmount)}</span>
+            )}
+            {sourceLimits.dailyAmountRemaining != null && (
+              <span>Daily left: {formatINR(sourceLimits.dailyAmountRemaining)}</span>
+            )}
+          </div>
         )}
       </div>
 

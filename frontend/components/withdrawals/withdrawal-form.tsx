@@ -12,6 +12,8 @@ import {
   type WithdrawalFormValues,
 } from "@/lib/validators/withdrawal"
 import { useExecuteWithdrawal } from "@/hooks/api/use-withdrawals"
+import { useAccountLimit } from "@/hooks/api/use-accounts"
+import { formatINR } from "@/lib/formatters/currency"
 import type { Account } from "@/types/account"
 import type { WithdrawalResponse } from "@/types/transaction"
 
@@ -55,6 +57,9 @@ export function WithdrawalForm({
 
   // Execution mutation
   const executeWithdrawalMutation = useExecuteWithdrawal()
+
+  // Account Limits query for source account
+  const { data: withdrawalLimits } = useAccountLimit(values.accountId, "WITHDRAWAL")
 
   // Resolved source account
   const selectedSourceAccount = React.useMemo(() => {
@@ -258,6 +263,17 @@ export function WithdrawalForm({
           >
             {errors.amount}
           </p>
+        )}
+
+        {withdrawalLimits && (
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono pt-1">
+            {withdrawalLimits.maxTransactionAmount != null && (
+              <span>Max withdrawal: {formatINR(withdrawalLimits.maxTransactionAmount)}</span>
+            )}
+            {withdrawalLimits.dailyAmountRemaining != null && (
+              <span>Daily left: {formatINR(withdrawalLimits.dailyAmountRemaining)}</span>
+            )}
+          </div>
         )}
       </div>
 

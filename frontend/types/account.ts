@@ -16,3 +16,15 @@ export interface Account {
 export interface CreateAccountRequest {
   currency: string
 }
+
+export interface AccountLimitSummary {
+  accountId: string
+  transactionType: "TRANSFER" | "DEPOSIT" | "WITHDRAWAL"
+  maxTransactionAmount: number | null
+  dailyAmountLimit: number | null
+  dailyAmountUsed: number
+  dailyCountLimit: number | null
+  dailyCountUsed: number
+  accountBalanceLimit: number | null
+  currency: string
+}

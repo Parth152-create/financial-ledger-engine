@@ -13,6 +13,7 @@ export const ROUTES = {
   RECONCILIATION: "/app/reconciliation",
   AUDIT: "/app/audit",
   SETTINGS: "/app/settings",
+  SETTINGS_POLICIES: "/app/settings/policies",
 } as const
 
 export const API_ROUTES = {
@@ -36,4 +37,7 @@ export const API_ROUTES = {
   RECONCILIATION_OVERALL: "/api/v1/reconciliation",
   RECONCILIATION_ACCOUNT: (accountId: string) => `/api/v1/reconciliation/accounts/${accountId}`,
   AUDIT_EVENTS: "/api/v1/audit-events",
+  ACCOUNT_LIMITS: (id: string) => `/api/v1/accounts/${id}/limits`,
+  ADMIN_POLICIES: "/api/v1/admin/policies",
+  ADMIN_POLICY_BY_ID: (id: string) => `/api/v1/admin/policies/${id}`,
 } as const

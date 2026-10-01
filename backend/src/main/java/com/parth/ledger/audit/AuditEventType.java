@@ -21,5 +21,15 @@ public enum AuditEventType {
     TRANSFER_COMPLETED,
     DEPOSIT_COMPLETED,
     WITHDRAWAL_COMPLETED,
-    TRANSACTION_REVERSED
+    TRANSACTION_REVERSED,
+
+    // Policy configuration events
+    POLICY_CREATED,
+    POLICY_UPDATED,
+    POLICY_DELETED,
+
+    // Financial transaction policy rejection events
+    TRANSFER_REJECTED_POLICY,
+    DEPOSIT_REJECTED_POLICY,
+    WITHDRAWAL_REJECTED_POLICY
 }

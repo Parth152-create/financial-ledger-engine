@@ -50,6 +50,8 @@ public abstract class BaseIntegrationTest {
             try {
                 jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE policy_usage_daily CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE financial_policies CASCADE");
             } catch (Exception ignored) {
             }
         }
@@ -61,6 +63,8 @@ public abstract class BaseIntegrationTest {
             try {
                 jdbcTemplate.execute("TRUNCATE TABLE ledger_entries CASCADE");
                 jdbcTemplate.execute("TRUNCATE TABLE audit_events CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE policy_usage_daily CASCADE");
+                jdbcTemplate.execute("TRUNCATE TABLE financial_policies CASCADE");
             } catch (Exception ignored) {
             }
         }

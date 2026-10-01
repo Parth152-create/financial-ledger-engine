@@ -12,6 +12,8 @@ import {
   type DepositFormValues,
 } from "@/lib/validators/deposit"
 import { useExecuteDeposit } from "@/hooks/api/use-deposits"
+import { useAccountLimit } from "@/hooks/api/use-accounts"
+import { formatINR } from "@/lib/formatters/currency"
 import type { Account } from "@/types/account"
 import type { DepositResponse } from "@/types/transaction"
 
@@ -55,6 +57,9 @@ export function DepositForm({
 
   // Execution mutation
   const executeDepositMutation = useExecuteDeposit()
+
+  // Account Limits query for destination account
+  const { data: depositLimits } = useAccountLimit(values.accountId, "DEPOSIT")
 
   // Resolved destination account
   const selectedDestinationAccount = React.useMemo(() => {
@@ -252,6 +257,17 @@ export function DepositForm({
           >
             {errors.amount}
           </p>
+        )}
+
+        {depositLimits && (
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono pt-1">
+            {depositLimits.maxTransactionAmount != null && (
+              <span>Max deposit: {formatINR(depositLimits.maxTransactionAmount)}</span>
+            )}
+            {depositLimits.dailyAmountRemaining != null && (
+              <span>Daily left: {formatINR(depositLimits.dailyAmountRemaining)}</span>
+            )}
+          </div>
         )}
       </div>
 

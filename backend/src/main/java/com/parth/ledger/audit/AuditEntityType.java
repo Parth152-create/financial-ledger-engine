@@ -7,5 +7,6 @@ public enum AuditEntityType {
     USER,
     ACCOUNT,
     TRANSACTION,
-    SYSTEM
+    SYSTEM,
+    POLICY
 }

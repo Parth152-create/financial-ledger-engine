@@ -60,19 +60,22 @@ public class TransferService {
     private final IdempotencyCacheService idempotencyCacheService;
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
+    private final com.parth.ledger.policy.PolicyService policyService;
 
     public TransferService(AccountRepository accountRepository,
                            TransactionRepository transactionRepository,
                            LedgerEntryRepository ledgerEntryRepository,
                            IdempotencyCacheService idempotencyCacheService,
                            AuthenticatedUserService authenticatedUserService,
-                           com.parth.ledger.audit.AuditEventService auditEventService) {
+                           com.parth.ledger.audit.AuditEventService auditEventService,
+                           com.parth.ledger.policy.PolicyService policyService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.idempotencyCacheService = idempotencyCacheService;
         this.authenticatedUserService = authenticatedUserService;
         this.auditEventService = auditEventService;
+        this.policyService = policyService;
     }
 
     /**
@@ -285,6 +288,33 @@ public class TransferService {
                     "Insufficient balance in source account " + sourceId + ": available "
                             + sourceAccount.getBalance() + ", required " + scaledAmount
             );
+        }
+
+        // 9.5. Policy Engine Evaluation: Max amount, daily amount, daily count, destination balance limit
+        try {
+            policyService.evaluateAndRecordTransferLimits(sourceAccount, destinationAccount, scaledAmount);
+        } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+            try {
+                auditEventService.recordPolicyRejectionEventOnce(
+                        authenticatedUser != null ? authenticatedUser.getId() : null,
+                        com.parth.ledger.audit.AuditEventType.TRANSFER_REJECTED_POLICY,
+                        com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                        sourceId,
+                        cleanIdempotencyKey,
+                        "TRANSFER",
+                        java.util.Map.of(
+                                "policyType", ex.getErrorCode().name(),
+                                "reason", ex.getMessage(),
+                                "amount", scaledAmount,
+                                "currency", currency,
+                                "sourceAccountId", sourceId,
+                                "destinationAccountId", destinationId
+                        )
+                );
+            } catch (Exception auditErr) {
+                log.warn("Failed to record TRANSFER_REJECTED_POLICY audit event: {}", auditErr.getMessage());
+            }
+            throw ex;
         }
 
         // 10. Debit source account & 11. Credit destination account

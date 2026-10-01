@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { LogOut, Loader2, ShieldCheck, AlertCircle } from "lucide-react"
 import { Section } from "@/components/ui/section"
 import { DataRow } from "@/components/ui/data-row"
@@ -10,6 +11,7 @@ import { ThemeSelector } from "@/components/settings/theme-selector"
 import { PasswordForm } from "@/components/settings/password-form"
 import { useAuth } from "@/hooks/auth/use-auth"
 import { SITE_CONFIG } from "@/config/site"
+import { ROUTES } from "@/constants/routes"
 import { getSettingsErrorMessage } from "@/lib/validators/settings"
 
 function SettingsSkeleton() {
@@ -160,6 +162,35 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+        </div>
+      </Section>
+
+      {/* Financial Policies & Limits (Admin) */}
+      <Section
+        title="Financial Policies & Limits (Admin)"
+        description="Platform transaction limits, daily cumulative quotas, and account balance caps."
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
+          <div>
+            <span className="font-medium text-foreground text-[13.5px] block">
+              Policy Engine Configuration
+            </span>
+            <span className="text-[12.5px] text-muted-foreground">
+              Configure global limits and account-specific policy overrides for transfers, deposits, and withdrawals.
+            </span>
+          </div>
+
+          <Link href={ROUTES.SETTINGS_POLICIES}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-[13px] self-start sm:self-auto shrink-0"
+            >
+              <ShieldCheck className="size-3.5 text-primary" />
+              <span>Manage Policies</span>
+            </Button>
+          </Link>
         </div>
       </Section>
 

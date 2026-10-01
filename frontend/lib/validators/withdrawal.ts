@@ -165,6 +165,18 @@ export function getWithdrawalErrorMessage(error: unknown): string {
     }
 
     if (status === 422) {
+      if (apiErr.code === "POLICY_TRANSACTION_LIMIT_EXCEEDED") {
+        return rawMessage || "This withdrawal exceeds the maximum allowed transaction limit."
+      }
+      if (apiErr.code === "POLICY_DAILY_AMOUNT_LIMIT_EXCEEDED") {
+        return rawMessage || "Daily cumulative withdrawal amount limit exceeded for this account."
+      }
+      if (apiErr.code === "POLICY_DAILY_COUNT_LIMIT_EXCEEDED") {
+        return rawMessage || "Daily withdrawal count limit exceeded for this account."
+      }
+      if (apiErr.code === "POLICY_BALANCE_LIMIT_EXCEEDED") {
+        return rawMessage || "Withdrawal rejected: account balance limit constraint violated."
+      }
       const lower = rawMessage.toLowerCase()
       if (lower.includes("insufficient balance")) {
         return "Insufficient balance in the source account to complete this withdrawal."
@@ -178,7 +190,7 @@ export function getWithdrawalErrorMessage(error: unknown): string {
       if (lower.includes("active")) {
         return "Source account must be active to complete a withdrawal."
       }
-      return "The withdrawal could not be processed due to account restrictions or insufficient funds."
+      return rawMessage || "The withdrawal could not be processed due to account restrictions or insufficient funds."
     }
 
     if (status === 400) {

@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { AccountHeader } from "@/components/accounts/account-header"
 import { AccountMeta } from "@/components/accounts/account-meta"
+import { AccountLimitsCard } from "@/components/accounts/account-limits-card"
 import { Button } from "@/components/ui/button"
 import { AccountTransactionHistory } from "@/components/transactions/account-transaction-history"
 import { AccountStatementView } from "@/components/statement/account-statement-view"
@@ -187,7 +188,7 @@ export default function AccountDetailPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
+        <div className="md:col-span-1 space-y-4">
           <AccountMeta
             accountNumber={account.accountNumber}
             accountType={account.accountType === "USER_CHECKING" ? "Checking" : account.accountType}
@@ -198,6 +199,7 @@ export default function AccountDetailPage() {
             accountId={account.accountId}
             reconciliationStatus="CONSISTENT"
           />
+          <AccountLimitsCard accountId={account.accountId} />
         </div>
 
         <div className="md:col-span-2 space-y-3">

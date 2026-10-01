@@ -157,6 +157,18 @@ export function getDepositErrorMessage(error: unknown): string {
     }
 
     if (status === 422) {
+      if (apiErr.code === "POLICY_TRANSACTION_LIMIT_EXCEEDED") {
+        return rawMessage || "This deposit exceeds the maximum allowed transaction limit."
+      }
+      if (apiErr.code === "POLICY_DAILY_AMOUNT_LIMIT_EXCEEDED") {
+        return rawMessage || "Daily cumulative deposit amount limit exceeded for this account."
+      }
+      if (apiErr.code === "POLICY_DAILY_COUNT_LIMIT_EXCEEDED") {
+        return rawMessage || "Daily deposit count limit exceeded for this account."
+      }
+      if (apiErr.code === "POLICY_BALANCE_LIMIT_EXCEEDED") {
+        return rawMessage || "Deposit rejected: destination account balance would exceed its maximum allowed limit."
+      }
       const lower = rawMessage.toLowerCase()
       if (lower.includes("insufficient balance") || lower.includes("clearing")) {
         return "Deposit could not be processed due to system balance constraints."
@@ -170,7 +182,7 @@ export function getDepositErrorMessage(error: unknown): string {
       if (lower.includes("active")) {
         return "Destination account must be active to complete a deposit."
       }
-      return "The deposit could not be processed due to account restrictions."
+      return rawMessage || "The deposit could not be processed due to account restrictions."
     }
 
     if (status === 400) {
