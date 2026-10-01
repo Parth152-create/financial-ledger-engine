@@ -1,0 +1,41 @@
+name: Docker Build CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-build.yml'
+
+jobs:
+  build-images:
+    name: Build Docker Images (No Publish)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Build Backend Image
+        run: |
+          docker build -t financial-ledger-backend:ci ./backend
+
+      - name: Build Frontend Image
+        run: |
+          docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8085 -t financial-ledger-frontend:ci ./frontend
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose config
