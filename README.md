@@ -308,7 +308,7 @@ npm run lint
 # Run production build
 npm run build
 ```
-*Verification status: 512 backend tests passed, 207 frontend tests passed, 0 lint warnings/errors, 14/14 static and dynamic routes compiled successfully.*
+*Verification status: 614 backend tests passed, 229 frontend tests passed, 0 lint warnings/errors, 15/15 static and dynamic routes compiled successfully.*
 
 ---
 
@@ -323,6 +323,7 @@ financial-ledger-engine/
 │   │   ├── auth/                         # Dual session-based auth (BCrypt + OAuth2)
 │   │   ├── common/                       # Base entities, global exception handler
 │   │   ├── ledger/                       # Double-entry ledger journal and repository
+│   │   ├── observability/                # Correlation filter, structured logging, Micrometer metrics & health
 │   │   ├── ratelimit/                    # Redis Lua token bucket rate limiting
 │   │   ├── reconciliation/               # Balance vs ledger drift audit engine
 │   │   ├── system/                       # System clearing & initial treasury funding
@@ -353,6 +354,7 @@ financial-ledger-engine/
 - [Account Lifecycle API Specification (V10)](docs/ACCOUNT_LIFECYCLE_API.md)
 - [Audit Trail & Operational Audit Events Specification (V2.1)](docs/AUDIT_TRAIL_API.md)
 - [Transaction Reversals & Compensating Transactions (V2.2)](docs/TRANSACTION_REVERSAL_API.md)
+- [Observability & Operational Diagnostics (V2.4)](docs/OBSERVABILITY_AND_DIAGNOSTICS.md)
 - [Transfer API Specification](docs/TRANSFER_API.md)
 - [Authentication & Credentials Guide](docs/AUTHENTICATION_AND_CREDENTIALS.md)
 - [Rate Limiting & Load Testing Benchmarks](docs/RATE_LIMITING_AND_LOAD_TESTING.md)

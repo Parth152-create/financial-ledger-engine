@@ -55,6 +55,26 @@ public class WithdrawalService {
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
     private final com.parth.ledger.policy.PolicyService policyService;
+    private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public WithdrawalService(AccountRepository accountRepository,
+                             TransactionRepository transactionRepository,
+                             LedgerEntryRepository ledgerEntryRepository,
+                             IdempotencyCacheService idempotencyCacheService,
+                             AuthenticatedUserService authenticatedUserService,
+                             com.parth.ledger.audit.AuditEventService auditEventService,
+                             com.parth.ledger.policy.PolicyService policyService,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.ledgerEntryRepository = ledgerEntryRepository;
+        this.idempotencyCacheService = idempotencyCacheService;
+        this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
+        this.policyService = policyService;
+        this.ledgerMetrics = ledgerMetrics;
+    }
 
     public WithdrawalService(AccountRepository accountRepository,
                              TransactionRepository transactionRepository,
@@ -63,13 +83,7 @@ public class WithdrawalService {
                              AuthenticatedUserService authenticatedUserService,
                              com.parth.ledger.audit.AuditEventService auditEventService,
                              com.parth.ledger.policy.PolicyService policyService) {
-        this.accountRepository = accountRepository;
-        this.transactionRepository = transactionRepository;
-        this.ledgerEntryRepository = ledgerEntryRepository;
-        this.idempotencyCacheService = idempotencyCacheService;
-        this.authenticatedUserService = authenticatedUserService;
-        this.auditEventService = auditEventService;
-        this.policyService = policyService;
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null);
     }
 
     @Transactional
@@ -109,236 +123,294 @@ public class WithdrawalService {
             throw new IllegalArgumentException("Only INR currency is supported: " + currency);
         }
 
-        BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
-        String cleanDescription = (request.description() != null && !request.description().isBlank())
-                ? request.description().trim()
-                : null;
-        if (cleanDescription != null && cleanDescription.length() > 255) {
-            throw new IllegalArgumentException("Description cannot exceed 255 characters");
+        long startTime = System.currentTimeMillis();
+        if (ledgerMetrics != null) {
+            ledgerMetrics.recordOperation("WITHDRAWAL", "ATTEMPTED");
         }
 
-        User authenticatedUser = authenticatedUserService.getCurrentUser();
-
-        Optional<TransactionResponseDto> cachedResponse = Optional.empty();
         try {
-            cachedResponse = idempotencyCacheService.get(cleanIdempotencyKey, TransactionResponseDto.class);
-        } catch (Exception e) {
-            log.warn("Error accessing Redis idempotency cache for key '{}': {}. Failing open to PostgreSQL.",
-                    cleanIdempotencyKey, e.getMessage());
-        }
-
-        if (cachedResponse.isPresent()) {
-            TransactionResponseDto cached = cachedResponse.get();
-            boolean sameType = cached.transactionType() == TransactionType.WITHDRAWAL;
-            boolean sameSource = cached.sourceAccountId().equals(request.accountId());
-            boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
-            boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
-            boolean sameDesc = Objects.equals(cached.description(), cleanDescription);
-
-            if (sameType && sameSource && sameAmount && sameCurrency && sameDesc) {
-                if (!accountRepository.existsByIdAndUserId(request.accountId(), authenticatedUser.getId())) {
-                    log.warn("Unauthorized attempt to access cached withdrawal for account {} by user {}",
-                            request.accountId(), authenticatedUser.getId());
-                    throw new AccountNotFoundException("Account not found: " + request.accountId());
-                }
-                log.info("Redis idempotency fast-path hit for key '{}'. Returning cached transaction {}",
-                        cleanIdempotencyKey, cached.transactionId());
-                return new WithdrawalResult(cached, true);
-            } else {
-                log.warn("Idempotency conflict detected in Redis cache for key '{}'", cleanIdempotencyKey);
-                throw new IdempotencyConflictException(
-                        "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transaction with different parameters"
-                );
+            BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
+            String cleanDescription = (request.description() != null && !request.description().isBlank())
+                    ? request.description().trim()
+                    : null;
+            if (cleanDescription != null && cleanDescription.length() > 255) {
+                throw new IllegalArgumentException("Description cannot exceed 255 characters");
             }
-        }
 
-        Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
-        if (existingTx.isPresent()) {
-            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
-        }
+            User authenticatedUser = authenticatedUserService.getCurrentUser();
 
-        UUID sourceId = request.accountId();
-        UUID clearingId = SYSTEM_CLEARING_ACCOUNT_ID;
-
-        if (clearingId.equals(sourceId)) {
-            log.warn("Withdrawal rejected: attempted to use SYSTEM_CLEARING account {} as source", sourceId);
-            throw new AccountNotFoundException("Account not found: " + sourceId);
-        }
-
-        UUID firstLockId = sourceId.compareTo(clearingId) < 0 ? sourceId : clearingId;
-        UUID secondLockId = sourceId.compareTo(clearingId) < 0 ? clearingId : sourceId;
-
-        Account firstAccount = accountRepository.findByIdForUpdate(firstLockId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + firstLockId));
-        Account secondAccount = accountRepository.findByIdForUpdate(secondLockId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + secondLockId));
-
-        Account lockedSourceAccount = sourceId.equals(firstAccount.getId()) ? firstAccount : secondAccount;
-        Account lockedClearingAccount = clearingId.equals(secondAccount.getId()) ? secondAccount : firstAccount;
-
-        Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
-        if (txAfterLock.isPresent()) {
-            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
-        }
-
-        if (lockedClearingAccount.getAccountType() != AccountType.SYSTEM_CLEARING) {
-            throw new IllegalStateException("Configured clearing account " + clearingId + " is not of type SYSTEM_CLEARING");
-        }
-        if (!lockedClearingAccount.getCurrency().equalsIgnoreCase(currency)) {
-            throw new CurrencyMismatchException(
-                    "Currency mismatch: withdrawal currency '" + currency + "' does not match system clearing account currency '" + lockedClearingAccount.getCurrency() + "'"
-            );
-        }
-        if (lockedClearingAccount.getStatus() != AccountStatus.ACTIVE) {
-            throw new AccountStatusException("System clearing account " + clearingId + " is not ACTIVE");
-        }
-
-        if (lockedSourceAccount.getAccountType() != AccountType.USER_CHECKING) {
-            throw new AccountNotFoundException("Account not found: " + sourceId);
-        }
-        if (lockedSourceAccount.getUser() == null || !lockedSourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
-            throw new AccountNotFoundException("Account not found: " + sourceId);
-        }
-
-        if (lockedSourceAccount.getStatus() == AccountStatus.FROZEN) {
-            throw new AccountFrozenException("Source account " + sourceId + " is FROZEN");
-        }
-        if (lockedSourceAccount.getStatus() == AccountStatus.CLOSED) {
-            throw new AccountClosedException("Source account " + sourceId + " is CLOSED");
-        }
-        if (lockedSourceAccount.getStatus() != AccountStatus.ACTIVE) {
-            throw new AccountStatusException("Source account " + sourceId + " is not ACTIVE");
-        }
-
-        if (!lockedSourceAccount.getCurrency().equalsIgnoreCase(currency)) {
-            throw new CurrencyMismatchException(
-                    "Currency mismatch: withdrawal currency '" + currency + "' does not match source account currency '" + lockedSourceAccount.getCurrency() + "'"
-            );
-        }
-
-        if (lockedSourceAccount.getBalance().compareTo(scaledAmount) < 0) {
-            throw new InsufficientBalanceException(
-                    "Insufficient balance in source account: available "
-                            + lockedSourceAccount.getBalance() + ", required " + scaledAmount
-            );
-        }
-
-        // Policy Engine Evaluation: Max withdrawal amount, daily withdrawal amount, daily withdrawal count
-        try {
-            policyService.evaluateAndRecordWithdrawalLimits(lockedSourceAccount, scaledAmount);
-        } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+            Optional<TransactionResponseDto> cachedResponse = Optional.empty();
             try {
-                auditEventService.recordPolicyRejectionEventOnce(
-                        authenticatedUser != null ? authenticatedUser.getId() : null,
-                        com.parth.ledger.audit.AuditEventType.WITHDRAWAL_REJECTED_POLICY,
-                        com.parth.ledger.audit.AuditEntityType.ACCOUNT,
-                        sourceId,
-                        cleanIdempotencyKey,
-                        "WITHDRAWAL",
-                        java.util.Map.of(
-                                "policyType", ex.getErrorCode().name(),
-                                "reason", ex.getMessage(),
-                                "amount", scaledAmount,
-                                "currency", currency,
-                                "sourceAccountId", sourceId
-                        )
-                );
-            } catch (Exception auditErr) {
-                log.warn("Failed to record WITHDRAWAL_REJECTED_POLICY audit event: {}", auditErr.getMessage());
-            }
-            throw ex;
-        }
-
-        lockedSourceAccount.setBalance(lockedSourceAccount.getBalance().subtract(scaledAmount));
-        lockedClearingAccount.setBalance(lockedClearingAccount.getBalance().add(scaledAmount));
-
-        accountRepository.save(lockedSourceAccount);
-        accountRepository.save(lockedClearingAccount);
-
-        Transaction transaction = new Transaction(
-                cleanIdempotencyKey,
-                scaledAmount,
-                currency,
-                TransactionStatus.PENDING,
-                lockedSourceAccount,
-                lockedClearingAccount,
-                TransactionType.WITHDRAWAL,
-                authenticatedUser,
-                cleanDescription
-        );
-        transaction = transactionRepository.save(transaction);
-
-        LedgerEntry debitEntry = new LedgerEntry(
-                transaction,
-                lockedSourceAccount,
-                LedgerEntryType.DEBIT,
-                scaledAmount,
-                currency
-        );
-        LedgerEntry creditEntry = new LedgerEntry(
-                transaction,
-                lockedClearingAccount,
-                LedgerEntryType.CREDIT,
-                scaledAmount,
-                currency
-        );
-
-        ledgerEntryRepository.save(debitEntry);
-        ledgerEntryRepository.save(creditEntry);
-
-        BigDecimal totalDebits = debitEntry.getAmount();
-        BigDecimal totalCredits = creditEntry.getAmount();
-        if (totalDebits.compareTo(totalCredits) != 0) {
-            throw new UnbalancedLedgerException(
-                    "Double-entry ledger invariant violation: total debits (" + totalDebits
-                            + ") do not equal total credits (" + totalCredits + ")"
-            );
-        }
-
-        transaction.setStatus(TransactionStatus.COMPLETED);
-        transaction.setCompletedAt(Instant.now());
-        transaction = transactionRepository.save(transaction);
-
-        // Record WITHDRAWAL_COMPLETED operational audit event atomically within PostgreSQL transaction
-        auditEventService.recordEvent(
-                authenticatedUser != null ? authenticatedUser.getId() : null,
-                com.parth.ledger.audit.AuditEventType.WITHDRAWAL_COMPLETED,
-                com.parth.ledger.audit.AuditEntityType.TRANSACTION,
-                transaction.getId(),
-                java.util.Map.of(
-                        "amount", scaledAmount,
-                        "currency", currency,
-                        "sourceAccountId", sourceId
-                )
-        );
-
-        log.info("Successfully executed withdrawal: txId={}, amount={} {}, userAccount={} to clearing={}",
-                transaction.getId(), scaledAmount, currency, sourceId, clearingId);
-
-        TransactionResponseDto response = TransactionResponseDto.from(transaction);
-
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        idempotencyCacheService.set(cleanIdempotencyKey, response);
-                    } catch (Exception e) {
-                        log.warn("Failed to cache response in Redis after commit for key '{}': {}",
-                                cleanIdempotencyKey, e.getMessage());
-                    }
-                }
-            });
-        } else {
-            try {
-                idempotencyCacheService.set(cleanIdempotencyKey, response);
+                cachedResponse = idempotencyCacheService.get(cleanIdempotencyKey, TransactionResponseDto.class);
             } catch (Exception e) {
-                log.warn("Failed to cache response in Redis for key '{}': {}",
-                                cleanIdempotencyKey, e.getMessage());
+                log.warn("Error accessing Redis idempotency cache: {}. Failing open to PostgreSQL.", e.getMessage());
             }
-        }
 
-        return new WithdrawalResult(response, false);
+            if (cachedResponse.isPresent()) {
+                TransactionResponseDto cached = cachedResponse.get();
+                boolean sameType = cached.transactionType() == TransactionType.WITHDRAWAL;
+                boolean sameSource = cached.sourceAccountId().equals(request.accountId());
+                boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
+                boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
+                boolean sameDesc = Objects.equals(cached.description(), cleanDescription);
+
+                if (sameType && sameSource && sameAmount && sameCurrency && sameDesc) {
+                    if (!accountRepository.existsByIdAndUserId(request.accountId(), authenticatedUser.getId())) {
+                        log.warn("Unauthorized attempt to access cached withdrawal for account {} by user {}",
+                                com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(request.accountId()),
+                                com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()));
+                        throw new AccountNotFoundException("Account not found: " + request.accountId());
+                    }
+                    if (ledgerMetrics != null) {
+                        ledgerMetrics.recordIdempotencyOutcome("WITHDRAWAL", "REPLAY");
+                        ledgerMetrics.recordIdempotencyDuration("WITHDRAWAL", "REPLAY", System.currentTimeMillis() - startTime);
+                    }
+                    log.info("Redis idempotency fast-path hit. Returning cached transaction {}",
+                            com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(cached.transactionId()));
+                    return new WithdrawalResult(cached, true);
+                } else {
+                    log.warn("Idempotency conflict detected in Redis cache for withdrawal.");
+                    throw new IdempotencyConflictException(
+                            "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transaction with different parameters"
+                    );
+                }
+            }
+
+            Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
+            if (existingTx.isPresent()) {
+                return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser, startTime);
+            }
+
+            UUID sourceId = request.accountId();
+            UUID clearingId = SYSTEM_CLEARING_ACCOUNT_ID;
+
+            if (clearingId.equals(sourceId)) {
+                log.warn("Withdrawal rejected: attempted to use SYSTEM_CLEARING account as source");
+                throw new AccountNotFoundException("Account not found: " + sourceId);
+            }
+
+            UUID firstLockId = sourceId.compareTo(clearingId) < 0 ? sourceId : clearingId;
+            UUID secondLockId = sourceId.compareTo(clearingId) < 0 ? clearingId : sourceId;
+
+            Account firstAccount = accountRepository.findByIdForUpdate(firstLockId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + firstLockId));
+            Account secondAccount = accountRepository.findByIdForUpdate(secondLockId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + secondLockId));
+
+            Account lockedSourceAccount = sourceId.equals(firstAccount.getId()) ? firstAccount : secondAccount;
+            Account lockedClearingAccount = clearingId.equals(secondAccount.getId()) ? secondAccount : firstAccount;
+
+            Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
+            if (txAfterLock.isPresent()) {
+                return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser, startTime);
+            }
+
+            if (lockedClearingAccount.getAccountType() != AccountType.SYSTEM_CLEARING) {
+                throw new IllegalStateException("Configured clearing account is not of type SYSTEM_CLEARING");
+            }
+            if (!lockedClearingAccount.getCurrency().equalsIgnoreCase(currency)) {
+                throw new CurrencyMismatchException(
+                        "Currency mismatch: withdrawal currency '" + currency + "' does not match system clearing account currency '" + lockedClearingAccount.getCurrency() + "'"
+                );
+            }
+            if (lockedClearingAccount.getStatus() != AccountStatus.ACTIVE) {
+                throw new AccountStatusException("System clearing account " + clearingId + " is not ACTIVE");
+            }
+
+            if (lockedSourceAccount.getAccountType() != AccountType.USER_CHECKING) {
+                log.warn("Withdrawal rejected: source account {} has ineligible type {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId), lockedSourceAccount.getAccountType());
+                throw new AccountNotFoundException("Account not found: " + sourceId);
+            }
+            if (lockedSourceAccount.getUser() == null || !lockedSourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
+                log.warn("Source account {} not found or unauthorized for user {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId),
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()));
+                throw new AccountNotFoundException("Account not found: " + sourceId);
+            }
+
+            if (lockedSourceAccount.getStatus() == AccountStatus.FROZEN) {
+                log.warn("Withdrawal rejected: source account {} is FROZEN",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId));
+                throw new AccountFrozenException("Source account " + sourceId + " is FROZEN");
+            }
+            if (lockedSourceAccount.getStatus() == AccountStatus.CLOSED) {
+                log.warn("Withdrawal rejected: source account {} is CLOSED",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId));
+                throw new AccountClosedException("Source account " + sourceId + " is CLOSED");
+            }
+            if (lockedSourceAccount.getStatus() != AccountStatus.ACTIVE) {
+                log.warn("Withdrawal rejected: source account {} is in status {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId), lockedSourceAccount.getStatus());
+                throw new AccountStatusException("Source account " + sourceId + " is not ACTIVE");
+            }
+
+            if (!lockedSourceAccount.getCurrency().equalsIgnoreCase(currency)) {
+                throw new CurrencyMismatchException(
+                        "Currency mismatch: withdrawal currency '" + currency + "' does not match source account currency '" + lockedSourceAccount.getCurrency() + "'"
+                );
+            }
+
+            if (lockedSourceAccount.getBalance().compareTo(scaledAmount) < 0) {
+                log.warn("Withdrawal rejected: insufficient balance in source account: available {}, required {}",
+                        lockedSourceAccount.getBalance(), scaledAmount);
+                throw new InsufficientBalanceException(
+                        "Insufficient balance in source account: available "
+                                + lockedSourceAccount.getBalance() + ", required " + scaledAmount
+                );
+            }
+
+            // Policy Engine Evaluation: Max withdrawal amount, daily withdrawal amount, daily withdrawal count
+            try {
+                policyService.evaluateAndRecordWithdrawalLimits(lockedSourceAccount, scaledAmount);
+            } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+                try {
+                    auditEventService.recordPolicyRejectionEventOnce(
+                            authenticatedUser != null ? authenticatedUser.getId() : null,
+                            com.parth.ledger.audit.AuditEventType.WITHDRAWAL_REJECTED_POLICY,
+                            com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                            sourceId,
+                            cleanIdempotencyKey,
+                            "WITHDRAWAL",
+                            java.util.Map.of(
+                                    "policyType", ex.getErrorCode().name(),
+                                    "reason", ex.getMessage(),
+                                    "amount", scaledAmount,
+                                    "currency", currency,
+                                    "sourceAccountId", sourceId
+                            )
+                    );
+                } catch (Exception auditErr) {
+                    log.warn("Failed to record WITHDRAWAL_REJECTED_POLICY audit event: {}", auditErr.getMessage());
+                }
+                throw ex;
+            }
+
+            lockedSourceAccount.setBalance(lockedSourceAccount.getBalance().subtract(scaledAmount));
+            lockedClearingAccount.setBalance(lockedClearingAccount.getBalance().add(scaledAmount));
+
+            accountRepository.save(lockedSourceAccount);
+            accountRepository.save(lockedClearingAccount);
+
+            Transaction transaction = new Transaction(
+                    cleanIdempotencyKey,
+                    scaledAmount,
+                    currency,
+                    TransactionStatus.PENDING,
+                    lockedSourceAccount,
+                    lockedClearingAccount,
+                    TransactionType.WITHDRAWAL,
+                    authenticatedUser,
+                    cleanDescription
+            );
+            transaction = transactionRepository.save(transaction);
+
+            LedgerEntry debitEntry = new LedgerEntry(
+                    transaction,
+                    lockedSourceAccount,
+                    LedgerEntryType.DEBIT,
+                    scaledAmount,
+                    currency
+            );
+            LedgerEntry creditEntry = new LedgerEntry(
+                    transaction,
+                    lockedClearingAccount,
+                    LedgerEntryType.CREDIT,
+                    scaledAmount,
+                    currency
+            );
+
+            ledgerEntryRepository.save(debitEntry);
+            ledgerEntryRepository.save(creditEntry);
+
+            BigDecimal totalDebits = debitEntry.getAmount();
+            BigDecimal totalCredits = creditEntry.getAmount();
+            if (totalDebits.compareTo(totalCredits) != 0) {
+                throw new UnbalancedLedgerException(
+                        "Double-entry ledger invariant violation: total debits (" + totalDebits
+                                + ") do not equal total credits (" + totalCredits + ")"
+                );
+            }
+
+            transaction.setStatus(TransactionStatus.COMPLETED);
+            transaction.setCompletedAt(Instant.now());
+            transaction = transactionRepository.save(transaction);
+
+            // Record WITHDRAWAL_COMPLETED operational audit event atomically within PostgreSQL transaction
+            auditEventService.recordEvent(
+                    authenticatedUser != null ? authenticatedUser.getId() : null,
+                    com.parth.ledger.audit.AuditEventType.WITHDRAWAL_COMPLETED,
+                    com.parth.ledger.audit.AuditEntityType.TRANSACTION,
+                    transaction.getId(),
+                    java.util.Map.of(
+                            "amount", scaledAmount,
+                            "currency", currency,
+                            "sourceAccountId", sourceId
+                    )
+            );
+
+            log.info("Successfully executed withdrawal: txId={}, amount={} {}, userAccount={} to clearing={}",
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(transaction.getId()), scaledAmount, currency,
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId),
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(clearingId));
+
+            TransactionResponseDto response = TransactionResponseDto.from(transaction);
+
+            // Store successful response in Redis and record COMPLETED metrics ONLY after the PostgreSQL transaction commits
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            idempotencyCacheService.set(cleanIdempotencyKey, response);
+                        } catch (Exception e) {
+                            log.warn("Failed to cache response in Redis after commit: {}", e.getMessage());
+                        }
+                        if (ledgerMetrics != null) {
+                            ledgerMetrics.recordOperation("WITHDRAWAL", "COMPLETED");
+                            ledgerMetrics.recordIdempotencyOutcome("WITHDRAWAL", "FIRST_EXECUTION");
+                            ledgerMetrics.recordOperationDuration("WITHDRAWAL", "COMPLETED", System.currentTimeMillis() - startTime);
+                        }
+                    }
+                });
+            } else {
+                try {
+                    idempotencyCacheService.set(cleanIdempotencyKey, response);
+                } catch (Exception e) {
+                    log.warn("Failed to cache response in Redis: {}", e.getMessage());
+                }
+                if (ledgerMetrics != null) {
+                    ledgerMetrics.recordOperation("WITHDRAWAL", "COMPLETED");
+                    ledgerMetrics.recordIdempotencyOutcome("WITHDRAWAL", "FIRST_EXECUTION");
+                    ledgerMetrics.recordOperationDuration("WITHDRAWAL", "COMPLETED", System.currentTimeMillis() - startTime);
+                }
+            }
+
+            return new WithdrawalResult(response, false);
+
+        } catch (IdempotencyConflictException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordIdempotencyOutcome("WITHDRAWAL", "CONFLICT");
+                ledgerMetrics.recordIdempotencyDuration("WITHDRAWAL", "CONFLICT", System.currentTimeMillis() - startTime);
+                ledgerMetrics.recordOperation("WITHDRAWAL", "REJECTED");
+                ledgerMetrics.recordOperationDuration("WITHDRAWAL", "REJECTED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        } catch (AccountNotFoundException | AccountStatusException |
+                 CurrencyMismatchException | InsufficientBalanceException |
+                 InvalidAmountException | com.parth.ledger.policy.PolicyViolationException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordOperation("WITHDRAWAL", "REJECTED");
+                ledgerMetrics.recordOperationDuration("WITHDRAWAL", "REJECTED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        } catch (RuntimeException | Error e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordOperation("WITHDRAWAL", "FAILED");
+                ledgerMetrics.recordOperationDuration("WITHDRAWAL", "FAILED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        }
     }
 
     private WithdrawalResult handleExistingTransaction(
@@ -348,7 +420,8 @@ public class WithdrawalService {
             String currency,
             String cleanDescription,
             String idempotencyKey,
-            User authenticatedUser) {
+            User authenticatedUser,
+            long startTime) {
 
         boolean sameType = existing.getTransactionType() == TransactionType.WITHDRAWAL;
         boolean sameSource = existing.getSourceAccount().getId().equals(request.accountId());
@@ -359,22 +432,27 @@ public class WithdrawalService {
         if (sameType && sameSource && sameAmount && sameCurrency && sameDesc) {
             if (existing.getSourceAccount().getUser() == null ||
                     !existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
-                log.warn("Unauthorized attempt to access existing withdrawal {} for account {} by user {}",
-                        existing.getId(), existing.getSourceAccount().getId(), authenticatedUser.getId());
+                log.warn("Unauthorized attempt to access existing withdrawal for user {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()));
                 throw new AccountNotFoundException("Account not found: " + request.accountId());
             }
 
-            log.info("Idempotent retry detected for key '{}'. Returning existing transaction {}",
-                    idempotencyKey, existing.getId());
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordIdempotencyOutcome("WITHDRAWAL", "REPLAY");
+                ledgerMetrics.recordIdempotencyDuration("WITHDRAWAL", "REPLAY", System.currentTimeMillis() - startTime);
+            }
+
+            log.info("Idempotent retry detected for withdrawal. Returning existing transaction {}",
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(existing.getId()));
             TransactionResponseDto response = TransactionResponseDto.from(existing);
             try {
                 idempotencyCacheService.set(idempotencyKey, response);
             } catch (Exception e) {
-                log.warn("Failed to repopulate Redis cache for key '{}': {}", idempotencyKey, e.getMessage());
+                log.warn("Failed to repopulate Redis cache: {}", e.getMessage());
             }
             return new WithdrawalResult(response, true);
         } else {
-            log.warn("Idempotency conflict for key '{}'", idempotencyKey);
+            log.warn("Idempotency conflict for withdrawal.");
             throw new IdempotencyConflictException(
                     "Idempotency key '" + idempotencyKey + "' was already used for a transaction with different parameters"
             );

@@ -32,6 +32,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import com.parth.ledger.observability.logging.RequestLoggingFilter;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
@@ -43,7 +44,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccountNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException ex, HttpServletRequest request) {
-        log.warn("Account not found: {}", ex.getMessage());
+        log.warn("Account not found for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.NOT_FOUND.value(),
                 HttpStatus.NOT_FOUND.getReasonPhrase(),
@@ -53,9 +54,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex, HttpServletRequest request) {
+        log.warn("Resource not found for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
+        ErrorResponse response = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                "Resource not found: " + request.getRequestURI(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
     @ExceptionHandler(TransactionNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleTransactionNotFound(TransactionNotFoundException ex, HttpServletRequest request) {
-        log.warn("Transaction not found: {}", ex.getMessage());
+        log.warn("Transaction not found for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.NOT_FOUND.value(),
                 HttpStatus.NOT_FOUND.getReasonPhrase(),
@@ -67,7 +80,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TransactionAlreadyReversedException.class)
     public ResponseEntity<ErrorResponse> handleTransactionAlreadyReversed(TransactionAlreadyReversedException ex, HttpServletRequest request) {
-        log.warn("Transaction already reversed: {}", ex.getMessage());
+        log.warn("Transaction already reversed for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 HttpStatus.CONFLICT.getReasonPhrase(),
@@ -79,7 +92,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TransactionNotReversibleException.class)
     public ResponseEntity<ErrorResponse> handleTransactionNotReversible(TransactionNotReversibleException ex, HttpServletRequest request) {
-        log.warn("Transaction not reversible: {}", ex.getMessage());
+        log.warn("Transaction not reversible for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.UNPROCESSABLE_CONTENT.value(),
                 HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase(),
@@ -130,7 +143,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex, HttpServletRequest request) {
-        log.warn("Insufficient balance: {}", ex.getMessage());
+        log.warn("Insufficient balance for requested operation on path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.UNPROCESSABLE_CONTENT.value(),
                 HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase(),
@@ -166,7 +179,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SameAccountTransferException.class)
     public ResponseEntity<ErrorResponse> handleSameAccountTransfer(SameAccountTransferException ex, HttpServletRequest request) {
-        log.warn("Invalid transfer - same account: {}", ex.getMessage());
+        log.warn("Invalid transfer - same account for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),
@@ -202,7 +215,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IdempotencyConflictException.class)
     public ResponseEntity<ErrorResponse> handleIdempotencyConflict(IdempotencyConflictException ex, HttpServletRequest request) {
-        log.warn("Idempotency conflict: {}", ex.getMessage());
+        log.warn("Idempotency conflict detected for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 HttpStatus.CONFLICT.getReasonPhrase(),
@@ -283,7 +296,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
         String message = ex.getMessage() != null ? ex.getMessage() : "";
         if (message.contains("uk_transactions_idempotency_key") || message.contains("idempotency_key")) {
-            log.warn("Database unique constraint violation on idempotency key: {}", message);
+            log.warn("Database unique constraint violation on idempotency key for path {}", request.getRequestURI());
             ErrorResponse response = new ErrorResponse(
                     HttpStatus.CONFLICT.value(),
                     HttpStatus.CONFLICT.getReasonPhrase(),
@@ -293,7 +306,7 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
         if (message.contains("uk_transactions_reverses_transaction_id") || message.contains("reverses_transaction_id") || message.contains("uk_audit_events_transaction_reversed")) {
-            log.warn("Database unique constraint violation on reversal: {}", message);
+            log.warn("Database unique constraint violation on transaction reversal for path {}", request.getRequestURI());
             ErrorResponse response = new ErrorResponse(
                     HttpStatus.CONFLICT.value(),
                     HttpStatus.CONFLICT.getReasonPhrase(),
@@ -303,7 +316,7 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
-        log.error("Data integrity violation: {}", message, ex);
+        log.error("Data integrity violation on {}: {}", request.getRequestURI(), ex.getClass().getSimpleName());
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 HttpStatus.CONFLICT.getReasonPhrase(),
@@ -327,7 +340,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccountOwnershipException.class)
     public ResponseEntity<ErrorResponse> handleAccountOwnership(AccountOwnershipException ex, HttpServletRequest request) {
-        log.warn("Account ownership authorization failed for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Account ownership authorization failed for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
@@ -339,7 +352,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex, HttpServletRequest request) {
-        log.warn("Authenticated user not found in database for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Authenticated user not found in database for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
@@ -351,7 +364,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationCredentialsNotFound(AuthenticationCredentialsNotFoundException ex, HttpServletRequest request) {
-        log.warn("Unauthenticated access attempt for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Unauthenticated access attempt for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),
@@ -363,7 +376,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        log.warn("Access denied for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Access denied for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
@@ -375,7 +388,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateEmail(DuplicateEmailException ex, HttpServletRequest request) {
-        log.warn("Duplicate account registration attempt for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Duplicate account registration attempt for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 HttpStatus.CONFLICT.getReasonPhrase(),
@@ -387,7 +400,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidPasswordException.class)
     public ResponseEntity<ErrorResponse> handleInvalidPassword(InvalidPasswordException ex, HttpServletRequest request) {
-        log.warn("Password validation failed for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Password validation failed for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),
@@ -399,7 +412,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({BadCredentialsException.class, UsernameNotFoundException.class})
     public ResponseEntity<ErrorResponse> handleBadCredentials(Exception ex, HttpServletRequest request) {
-        log.warn("Authentication failed for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Authentication failed for path {}", RequestLoggingFilter.sanitizePathForLogging(request.getRequestURI()));
         ErrorResponse response = new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),

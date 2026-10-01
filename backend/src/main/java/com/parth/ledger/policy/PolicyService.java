@@ -51,6 +51,7 @@ public class PolicyService {
     private final AuditEventService auditEventService;
     private final AuthenticatedUserService authenticatedUserService;
     private final Clock clock;
+    private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
 
     @Autowired
     public PolicyService(FinancialPolicyRepository financialPolicyRepository,
@@ -59,7 +60,8 @@ public class PolicyService {
                          AccountRepository accountRepository,
                          AuditEventService auditEventService,
                          AuthenticatedUserService authenticatedUserService,
-                         Clock clock) {
+                         Clock clock,
+                         @Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
         this.financialPolicyRepository = financialPolicyRepository;
         this.dailyPolicyUsageRepository = dailyPolicyUsageRepository;
         this.policyEvaluator = policyEvaluator;
@@ -67,6 +69,17 @@ public class PolicyService {
         this.auditEventService = auditEventService;
         this.authenticatedUserService = authenticatedUserService;
         this.clock = clock;
+        this.ledgerMetrics = ledgerMetrics;
+    }
+
+    public PolicyService(FinancialPolicyRepository financialPolicyRepository,
+                         DailyPolicyUsageRepository dailyPolicyUsageRepository,
+                         PolicyEvaluator policyEvaluator,
+                         AccountRepository accountRepository,
+                         AuditEventService auditEventService,
+                         AuthenticatedUserService authenticatedUserService,
+                         Clock clock) {
+        this(financialPolicyRepository, dailyPolicyUsageRepository, policyEvaluator, accountRepository, auditEventService, authenticatedUserService, clock, null);
     }
 
     public PolicyService(FinancialPolicyRepository financialPolicyRepository,
@@ -75,7 +88,7 @@ public class PolicyService {
                          AccountRepository accountRepository,
                          AuditEventService auditEventService,
                          AuthenticatedUserService authenticatedUserService) {
-        this(financialPolicyRepository, dailyPolicyUsageRepository, policyEvaluator, accountRepository, auditEventService, authenticatedUserService, Clock.systemUTC());
+        this(financialPolicyRepository, dailyPolicyUsageRepository, policyEvaluator, accountRepository, auditEventService, authenticatedUserService, Clock.systemUTC(), null);
     }
 
     /**
@@ -110,6 +123,23 @@ public class PolicyService {
                 .orElseThrow(() -> new IllegalStateException("Failed to acquire lock on daily policy usage for account " + accountId));
     }
 
+    private void evaluatePolicy(Optional<FinancialPolicy> policy, String txType, java.util.function.Consumer<FinancialPolicy> evaluation) {
+        if (policy.isPresent()) {
+            FinancialPolicy p = policy.get();
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordPolicyEvaluation(p.getPolicyType().name(), txType);
+            }
+            try {
+                evaluation.accept(p);
+            } catch (PolicyViolationException ex) {
+                if (ledgerMetrics != null) {
+                    ledgerMetrics.recordPolicyRejection(p.getPolicyType().name(), txType);
+                }
+                throw ex;
+            }
+        }
+    }
+
     /**
      * Evaluates transfer limits for source (debit) and destination (credit) accounts, and reserves daily quota.
      * Must be called while holding pessimistic row-level locks on both accounts.
@@ -120,22 +150,22 @@ public class PolicyService {
 
         // 1. Evaluate Source Max Transaction Amount
         Optional<FinancialPolicy> maxTxPolicy = resolveApplicablePolicy(sourceAccount.getId(), PolicyType.MAX_TRANSACTION_AMOUNT, TransactionType.TRANSFER);
-        maxTxPolicy.ifPresent(p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
+        evaluatePolicy(maxTxPolicy, "TRANSFER", p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
 
         // 2. Lock Source Daily Policy Usage Row
         DailyPolicyUsage sourceUsage = getOrCreateDailyUsageForUpdate(sourceAccount.getId(), TransactionType.TRANSFER, today);
 
         // 3. Evaluate Source Daily Amount Limit
         Optional<FinancialPolicy> dailyAmountPolicy = resolveApplicablePolicy(sourceAccount.getId(), PolicyType.DAILY_TRANSACTION_AMOUNT, TransactionType.TRANSFER);
-        dailyAmountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyAmountLimit(p, sourceUsage.getAmountUsed(), amount));
+        evaluatePolicy(dailyAmountPolicy, "TRANSFER", p -> policyEvaluator.evaluateDailyAmountLimit(p, sourceUsage.getAmountUsed(), amount));
 
         // 4. Evaluate Source Daily Count Limit
         Optional<FinancialPolicy> dailyCountPolicy = resolveApplicablePolicy(sourceAccount.getId(), PolicyType.DAILY_TRANSACTION_COUNT, TransactionType.TRANSFER);
-        dailyCountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyCountLimit(p, sourceUsage.getTransactionCount()));
+        evaluatePolicy(dailyCountPolicy, "TRANSFER", p -> policyEvaluator.evaluateDailyCountLimit(p, sourceUsage.getTransactionCount()));
 
         // 5. Evaluate Destination Account Balance Limit (credit operation)
         Optional<FinancialPolicy> balancePolicy = resolveApplicablePolicy(destinationAccount.getId(), PolicyType.ACCOUNT_BALANCE_LIMIT, null);
-        balancePolicy.ifPresent(p -> policyEvaluator.evaluateAccountBalanceLimit(p, destinationAccount.getBalance(), amount));
+        evaluatePolicy(balancePolicy, "TRANSFER", p -> policyEvaluator.evaluateAccountBalanceLimit(p, destinationAccount.getBalance(), amount));
 
         // 6. Record Quota Consumption for Source Account
         sourceUsage.setAmountUsed(sourceUsage.getAmountUsed().add(amount));
@@ -156,22 +186,22 @@ public class PolicyService {
 
         // 1. Evaluate Max Deposit Amount
         Optional<FinancialPolicy> maxTxPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.MAX_TRANSACTION_AMOUNT, TransactionType.DEPOSIT);
-        maxTxPolicy.ifPresent(p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
+        evaluatePolicy(maxTxPolicy, "DEPOSIT", p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
 
         // 2. Lock User Deposit Daily Usage Row
         DailyPolicyUsage userUsage = getOrCreateDailyUsageForUpdate(userAccount.getId(), TransactionType.DEPOSIT, today);
 
         // 3. Evaluate User Daily Deposit Amount Limit
         Optional<FinancialPolicy> dailyAmountPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.DAILY_TRANSACTION_AMOUNT, TransactionType.DEPOSIT);
-        dailyAmountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyAmountLimit(p, userUsage.getAmountUsed(), amount));
+        evaluatePolicy(dailyAmountPolicy, "DEPOSIT", p -> policyEvaluator.evaluateDailyAmountLimit(p, userUsage.getAmountUsed(), amount));
 
         // 4. Evaluate User Daily Deposit Count Limit
         Optional<FinancialPolicy> dailyCountPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.DAILY_TRANSACTION_COUNT, TransactionType.DEPOSIT);
-        dailyCountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyCountLimit(p, userUsage.getTransactionCount()));
+        evaluatePolicy(dailyCountPolicy, "DEPOSIT", p -> policyEvaluator.evaluateDailyCountLimit(p, userUsage.getTransactionCount()));
 
         // 5. Evaluate User Account Balance Limit (credit operation)
         Optional<FinancialPolicy> balancePolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.ACCOUNT_BALANCE_LIMIT, null);
-        balancePolicy.ifPresent(p -> policyEvaluator.evaluateAccountBalanceLimit(p, userAccount.getBalance(), amount));
+        evaluatePolicy(balancePolicy, "DEPOSIT", p -> policyEvaluator.evaluateAccountBalanceLimit(p, userAccount.getBalance(), amount));
 
         // 6. Record Quota Consumption for User Account
         userUsage.setAmountUsed(userUsage.getAmountUsed().add(amount));
@@ -192,18 +222,18 @@ public class PolicyService {
 
         // 1. Evaluate Max Withdrawal Amount
         Optional<FinancialPolicy> maxTxPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.MAX_TRANSACTION_AMOUNT, TransactionType.WITHDRAWAL);
-        maxTxPolicy.ifPresent(p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
+        evaluatePolicy(maxTxPolicy, "WITHDRAWAL", p -> policyEvaluator.evaluateMaxTransactionAmount(p, amount));
 
         // 2. Lock User Withdrawal Daily Usage Row
         DailyPolicyUsage userUsage = getOrCreateDailyUsageForUpdate(userAccount.getId(), TransactionType.WITHDRAWAL, today);
 
         // 3. Evaluate User Daily Withdrawal Amount Limit
         Optional<FinancialPolicy> dailyAmountPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.DAILY_TRANSACTION_AMOUNT, TransactionType.WITHDRAWAL);
-        dailyAmountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyAmountLimit(p, userUsage.getAmountUsed(), amount));
+        evaluatePolicy(dailyAmountPolicy, "WITHDRAWAL", p -> policyEvaluator.evaluateDailyAmountLimit(p, userUsage.getAmountUsed(), amount));
 
         // 4. Evaluate User Daily Withdrawal Count Limit
         Optional<FinancialPolicy> dailyCountPolicy = resolveApplicablePolicy(userAccount.getId(), PolicyType.DAILY_TRANSACTION_COUNT, TransactionType.WITHDRAWAL);
-        dailyCountPolicy.ifPresent(p -> policyEvaluator.evaluateDailyCountLimit(p, userUsage.getTransactionCount()));
+        evaluatePolicy(dailyCountPolicy, "WITHDRAWAL", p -> policyEvaluator.evaluateDailyCountLimit(p, userUsage.getTransactionCount()));
 
         // Note: Withdrawals decrease balance, so ACCOUNT_BALANCE_LIMIT does not block withdrawals.
 

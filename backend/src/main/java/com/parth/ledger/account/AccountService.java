@@ -6,6 +6,7 @@ import com.parth.ledger.security.AuthenticatedUserService;
 import com.parth.ledger.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.parth.ledger.observability.logging.MaskingUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +79,10 @@ public class AccountService {
 
         Account saved = accountRepository.save(account);
         log.info("Created USER_CHECKING account: id={}, accountNumber={}, currency={}, userId={}",
-                saved.getId(), saved.getAccountNumber(), saved.getCurrency(), currentUser.getId());
+                MaskingUtils.maskAccountId(saved.getId()),
+                MaskingUtils.maskAccountNumber(saved.getAccountNumber()),
+                saved.getCurrency(),
+                MaskingUtils.maskAccountId(currentUser.getId()));
 
         auditEventService.recordEvent(
                 currentUser.getId(),
@@ -172,7 +176,7 @@ public class AccountService {
         }
 
         if (account.getStatus() == AccountStatus.FROZEN) {
-            log.info("Account {} is already FROZEN. Returning current representation.", accountId);
+            log.info("Account {} is already FROZEN. Returning current representation.", MaskingUtils.maskAccountId(accountId));
             return AccountResponseDto.from(account);
         }
 
@@ -182,7 +186,7 @@ public class AccountService {
 
         account.setStatus(AccountStatus.FROZEN);
         Account saved = accountRepository.save(account);
-        log.info("Account {} successfully frozen by admin", accountId);
+        log.info("Account {} successfully frozen by admin", MaskingUtils.maskAccountId(accountId));
 
         UUID actorId = null;
         try {
@@ -242,7 +246,7 @@ public class AccountService {
 
         account.setStatus(AccountStatus.ACTIVE);
         Account saved = accountRepository.save(account);
-        log.info("Account {} successfully unfrozen by admin", accountId);
+        log.info("Account {} successfully unfrozen by admin", MaskingUtils.maskAccountId(accountId));
 
         UUID unfreezeActorId = null;
         try {
@@ -290,25 +294,29 @@ public class AccountService {
         if (account.getAccountType() != AccountType.USER_CHECKING ||
                 account.getUser() == null ||
                 !account.getUser().getId().equals(currentUser.getId())) {
-            log.warn("Account {} not found or unauthorized for user {}", accountId, currentUser.getId());
+            log.warn("Account {} not found or unauthorized for user {}",
+                    MaskingUtils.maskAccountId(accountId),
+                    MaskingUtils.maskAccountId(currentUser.getId()));
             throw new AccountNotFoundException("Account not found: " + accountId);
         }
 
         // Idempotent return if already CLOSED
         if (account.getStatus() == AccountStatus.CLOSED) {
-            log.info("Account {} is already CLOSED. Returning current representation.", accountId);
+            log.info("Account {} is already CLOSED. Returning current representation.", MaskingUtils.maskAccountId(accountId));
             return AccountResponseDto.from(account);
         }
 
         // Enforce zero-balance invariant
         if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {
-            log.warn("Cannot close account {} with non-zero balance: {}", accountId, account.getBalance());
+            log.warn("Cannot close account {} with non-zero balance: {}", MaskingUtils.maskAccountId(accountId), account.getBalance());
             throw new AccountStatusException("Cannot close account with non-zero balance: " + account.getBalance());
         }
 
         account.setStatus(AccountStatus.CLOSED);
         Account saved = accountRepository.save(account);
-        log.info("Account {} successfully closed by owner {}", accountId, currentUser.getId());
+        log.info("Account {} successfully closed by owner {}",
+                MaskingUtils.maskAccountId(accountId),
+                MaskingUtils.maskAccountId(currentUser.getId()));
 
         auditEventService.recordEvent(
                 currentUser.getId(),

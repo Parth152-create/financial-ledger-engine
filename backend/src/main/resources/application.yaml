@@ -90,4 +90,13 @@ management:
 
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: always
+  health:
+    redis:
+      enabled: false
+    db:
+      enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId}]"

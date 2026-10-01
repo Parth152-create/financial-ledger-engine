@@ -61,6 +61,26 @@ public class TransferService {
     private final AuthenticatedUserService authenticatedUserService;
     private final com.parth.ledger.audit.AuditEventService auditEventService;
     private final com.parth.ledger.policy.PolicyService policyService;
+    private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public TransferService(AccountRepository accountRepository,
+                           TransactionRepository transactionRepository,
+                           LedgerEntryRepository ledgerEntryRepository,
+                           IdempotencyCacheService idempotencyCacheService,
+                           AuthenticatedUserService authenticatedUserService,
+                           com.parth.ledger.audit.AuditEventService auditEventService,
+                           com.parth.ledger.policy.PolicyService policyService,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.ledgerEntryRepository = ledgerEntryRepository;
+        this.idempotencyCacheService = idempotencyCacheService;
+        this.authenticatedUserService = authenticatedUserService;
+        this.auditEventService = auditEventService;
+        this.policyService = policyService;
+        this.ledgerMetrics = ledgerMetrics;
+    }
 
     public TransferService(AccountRepository accountRepository,
                            TransactionRepository transactionRepository,
@@ -69,13 +89,7 @@ public class TransferService {
                            AuthenticatedUserService authenticatedUserService,
                            com.parth.ledger.audit.AuditEventService auditEventService,
                            com.parth.ledger.policy.PolicyService policyService) {
-        this.accountRepository = accountRepository;
-        this.transactionRepository = transactionRepository;
-        this.ledgerEntryRepository = ledgerEntryRepository;
-        this.idempotencyCacheService = idempotencyCacheService;
-        this.authenticatedUserService = authenticatedUserService;
-        this.auditEventService = auditEventService;
-        this.policyService = policyService;
+        this(accountRepository, transactionRepository, ledgerEntryRepository, idempotencyCacheService, authenticatedUserService, auditEventService, policyService, null);
     }
 
     /**
@@ -88,6 +102,8 @@ public class TransferService {
      */
     @Transactional
     public TransferResponseDto executeTransfer(String idempotencyKey, TransferRequestDto request) {
+        long startTime = System.currentTimeMillis();
+
         // 1. Validate request parameters
         if (idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
             throw new IllegalArgumentException("Idempotency key must not be blank");
@@ -127,294 +143,316 @@ public class TransferService {
             throw new IllegalArgumentException("Only INR currency is supported: " + currency);
         }
 
-        // Standardize scale to 4 decimal places matching PostgreSQL NUMERIC(19,4)
-        BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
-        String cleanDescription = (request.description() != null && !request.description().isBlank()) ? request.description().trim() : null;
+        if (ledgerMetrics != null) {
+            ledgerMetrics.recordOperation("TRANSFER", "ATTEMPTED");
+        }
 
-        // 5. Resolve authenticated application user from SecurityContext
-        User authenticatedUser = authenticatedUserService.getCurrentUser();
-
-        // Fast-Path: Check Redis idempotency cache before initiating DB transaction / locking
-        Optional<TransferResponseDto> cachedResponse = Optional.empty();
         try {
-            cachedResponse = idempotencyCacheService.get(cleanIdempotencyKey);
-        } catch (Exception e) {
-            log.warn("Error accessing Redis idempotency cache for key '{}': {}. Failing open to PostgreSQL.",
-                    cleanIdempotencyKey, e.getMessage());
-        }
+            // Standardize scale to 4 decimal places matching PostgreSQL NUMERIC(19,4)
+            BigDecimal scaledAmount = request.amount().setScale(4, RoundingMode.HALF_UP);
+            String cleanDescription = (request.description() != null && !request.description().isBlank()) ? request.description().trim() : null;
 
-        if (cachedResponse.isPresent()) {
-            TransferResponseDto cached = cachedResponse.get();
-            boolean sameSource = cached.sourceAccountId().equals(request.sourceAccountId());
-            boolean sameDest = cached.destinationAccountId().equals(request.destinationAccountId());
-            boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
-            boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
-            boolean sameDesc = Objects.equals(cached.description(), cleanDescription);
+            // 5. Resolve authenticated application user from SecurityContext
+            User authenticatedUser = authenticatedUserService.getCurrentUser();
 
-            if (sameSource && sameDest && sameAmount && sameCurrency && sameDesc) {
-                // Verify source account ownership on Redis fast-path hit
-                if (!accountRepository.existsByIdAndUserId(request.sourceAccountId(), authenticatedUser.getId())) {
-                    log.warn("Unauthorized attempt to access cached transfer for source account {} by user {}",
-                            request.sourceAccountId(), authenticatedUser.getId());
-                    throw new AccountOwnershipException("Authenticated user does not own source account");
-                }
-                log.info("Redis idempotency fast-path hit for key '{}'. Returning cached transaction {}",
-                        cleanIdempotencyKey, cached.transactionId());
-                return cached;
-            } else {
-                log.warn("Idempotency conflict detected in Redis cache for key '{}'. Cached: [source={}, dest={}, amount={}, currency={}, desc={}], Request: [source={}, dest={}, amount={}, currency={}, desc={}]",
-                        cleanIdempotencyKey,
-                        cached.sourceAccountId(),
-                        cached.destinationAccountId(),
-                        cached.amount(),
-                        cached.currency(),
-                        cached.description(),
-                        request.sourceAccountId(),
-                        request.destinationAccountId(),
-                        scaledAmount,
-                        currency,
-                        cleanDescription);
-                throw new IdempotencyConflictException(
-                        "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transfer with different parameters"
-                );
-            }
-        }
-
-        // 6. Pre-lock Idempotency Check: Fast return for committed retries or conflict detection
-        Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
-        if (existingTx.isPresent()) {
-            return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
-        }
-
-        // 8. Deterministic Lock Ordering:
-        // Prevent two-account circular-wait deadlocks (e.g. concurrent A -> B and B -> A) by sorting
-        // the account UUIDs and always acquiring locks in ascending UUID order.
-        // NOTE: While deterministic ordering eliminates classic circular-wait patterns between these
-        // two accounts, it does not claim to eliminate all conceivable distributed deadlock conditions.
-        UUID sourceId = request.sourceAccountId();
-        UUID destinationId = request.destinationAccountId();
-
-        UUID firstLockId;
-        UUID secondLockId;
-        if (sourceId.compareTo(destinationId) < 0) {
-            firstLockId = sourceId;
-            secondLockId = destinationId;
-        } else {
-            firstLockId = destinationId;
-            secondLockId = sourceId;
-        }
-
-        Account firstAccount = accountRepository.findByIdForUpdate(firstLockId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + firstLockId));
-        Account secondAccount = accountRepository.findByIdForUpdate(secondLockId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + secondLockId));
-
-        Account sourceAccount = sourceId.equals(firstAccount.getId()) ? firstAccount : secondAccount;
-        Account destinationAccount = destinationId.equals(secondAccount.getId()) ? secondAccount : firstAccount;
-
-        // Post-lock Idempotency Re-check:
-        // If a concurrent request with the exact same idempotency key was in-flight, it held the account
-        // lock while this thread was waiting. Now that this thread acquired the lock, check if the other
-        // thread committed the transaction to avoid duplicate transfers.
-        Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
-        if (txAfterLock.isPresent()) {
-            return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser);
-        }
-
-        // Account Type Validation:
-        // User transfers can strictly only occur between USER_CHECKING accounts.
-        // System clearing accounts must NOT be transferred via the user transfer endpoint.
-        if (sourceAccount.getAccountType() != AccountType.USER_CHECKING) {
-            log.warn("Transfer rejected: source account {} has ineligible type {}", sourceId, sourceAccount.getAccountType());
-            throw new InvalidAccountTypeException("Source account must be a USER_CHECKING account: " + sourceId);
-        }
-        if (destinationAccount.getAccountType() != AccountType.USER_CHECKING) {
-            log.warn("Transfer rejected: destination account {} has ineligible type {}", destinationId, destinationAccount.getAccountType());
-            throw new InvalidAccountTypeException("Destination account must be a USER_CHECKING account: " + destinationId);
-        }
-
-        // 9. Source Account Ownership Authorization:
-        // Verify that the authenticated application user is the owner of the source account being debited.
-        // This check occurs while holding the pessimistic write lock on the source account to eliminate TOCTOU races.
-        if (sourceAccount.getUser() == null || !sourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
-            log.warn("Unauthorized transfer: user {} does not own source account {}",
-                    authenticatedUser.getId(), sourceId);
-            throw new AccountOwnershipException("Authenticated user does not own source account");
-        }
-
-        // Account Status Validation:
-        // Ensure both source and destination accounts are ACTIVE. Transfers fail if FROZEN or CLOSED.
-        if (sourceAccount.getStatus() == AccountStatus.FROZEN) {
-            log.warn("Transfer rejected: source account {} is FROZEN", sourceId);
-            throw new AccountFrozenException("Source account " + sourceId + " is FROZEN");
-        }
-        if (sourceAccount.getStatus() == AccountStatus.CLOSED) {
-            log.warn("Transfer rejected: source account {} is CLOSED", sourceId);
-            throw new AccountClosedException("Source account " + sourceId + " is CLOSED");
-        }
-        if (sourceAccount.getStatus() != AccountStatus.ACTIVE) {
-            log.warn("Transfer rejected: source account {} is in status {}", sourceId, sourceAccount.getStatus());
-            throw new AccountStatusException("Source account " + sourceId + " is not ACTIVE");
-        }
-
-        if (destinationAccount.getStatus() == AccountStatus.FROZEN) {
-            log.warn("Transfer rejected: destination account {} is FROZEN", destinationId);
-            throw new AccountFrozenException("Destination account " + destinationId + " is FROZEN");
-        }
-        if (destinationAccount.getStatus() == AccountStatus.CLOSED) {
-            log.warn("Transfer rejected: destination account {} is CLOSED", destinationId);
-            throw new AccountClosedException("Destination account " + destinationId + " is CLOSED");
-        }
-        if (destinationAccount.getStatus() != AccountStatus.ACTIVE) {
-            log.warn("Transfer rejected: destination account {} is in status {}", destinationId, destinationAccount.getStatus());
-            throw new AccountStatusException("Destination account " + destinationId + " is not ACTIVE");
-        }
-
-        // 2 & 5. Validate currency compatibility
-        if (!sourceAccount.getCurrency().equalsIgnoreCase(currency)) {
-            throw new CurrencyMismatchException(
-                    "Currency mismatch: transfer currency '" + currency + "' does not match source account currency '" + sourceAccount.getCurrency() + "'"
-            );
-        }
-        if (!destinationAccount.getCurrency().equalsIgnoreCase(currency)) {
-            throw new CurrencyMismatchException(
-                    "Currency mismatch: transfer currency '" + currency + "' does not match destination account currency '" + destinationAccount.getCurrency() + "'"
-            );
-        }
-
-        // 9. Check source balance
-        if (sourceAccount.getBalance().compareTo(scaledAmount) < 0) {
-            throw new InsufficientBalanceException(
-                    "Insufficient balance in source account " + sourceId + ": available "
-                            + sourceAccount.getBalance() + ", required " + scaledAmount
-            );
-        }
-
-        // 9.5. Policy Engine Evaluation: Max amount, daily amount, daily count, destination balance limit
-        try {
-            policyService.evaluateAndRecordTransferLimits(sourceAccount, destinationAccount, scaledAmount);
-        } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+            // Fast-Path: Check Redis idempotency cache before initiating DB transaction / locking
+            Optional<TransferResponseDto> cachedResponse = Optional.empty();
             try {
-                auditEventService.recordPolicyRejectionEventOnce(
-                        authenticatedUser != null ? authenticatedUser.getId() : null,
-                        com.parth.ledger.audit.AuditEventType.TRANSFER_REJECTED_POLICY,
-                        com.parth.ledger.audit.AuditEntityType.ACCOUNT,
-                        sourceId,
-                        cleanIdempotencyKey,
-                        "TRANSFER",
-                        java.util.Map.of(
-                                "policyType", ex.getErrorCode().name(),
-                                "reason", ex.getMessage(),
-                                "amount", scaledAmount,
-                                "currency", currency,
-                                "sourceAccountId", sourceId,
-                                "destinationAccountId", destinationId
-                        )
-                );
-            } catch (Exception auditErr) {
-                log.warn("Failed to record TRANSFER_REJECTED_POLICY audit event: {}", auditErr.getMessage());
-            }
-            throw ex;
-        }
-
-        // 10. Debit source account & 11. Credit destination account
-        sourceAccount.setBalance(sourceAccount.getBalance().subtract(scaledAmount));
-        destinationAccount.setBalance(destinationAccount.getBalance().add(scaledAmount));
-
-        accountRepository.save(sourceAccount);
-        accountRepository.save(destinationAccount);
-
-        // 12. Create transaction record (PENDING)
-        Transaction transaction = new Transaction(
-                cleanIdempotencyKey,
-                scaledAmount,
-                currency,
-                TransactionStatus.PENDING,
-                sourceAccount,
-                destinationAccount,
-                TransactionType.TRANSFER,
-                authenticatedUser,
-                cleanDescription
-        );
-        transaction = transactionRepository.save(transaction);
-
-        // 13. Create DEBIT ledger entry & 14. Create CREDIT ledger entry
-        LedgerEntry debitEntry = new LedgerEntry(
-                transaction,
-                sourceAccount,
-                LedgerEntryType.DEBIT,
-                scaledAmount,
-                currency
-        );
-        LedgerEntry creditEntry = new LedgerEntry(
-                transaction,
-                destinationAccount,
-                LedgerEntryType.CREDIT,
-                scaledAmount,
-                currency
-        );
-
-        ledgerEntryRepository.save(debitEntry);
-        ledgerEntryRepository.save(creditEntry);
-
-        // 15. Verify double-entry ledger entries balance (totalDebits == totalCredits)
-        BigDecimal totalDebits = debitEntry.getAmount();
-        BigDecimal totalCredits = creditEntry.getAmount();
-        if (totalDebits.compareTo(totalCredits) != 0) {
-            throw new UnbalancedLedgerException(
-                    "Double-entry ledger invariant violation: total debits (" + totalDebits
-                            + ") do not equal total credits (" + totalCredits + ")"
-            );
-        }
-
-        // 16. Complete transaction
-        transaction.setStatus(TransactionStatus.COMPLETED);
-        transaction.setCompletedAt(Instant.now());
-        transaction = transactionRepository.save(transaction);
-
-        // 17. Record TRANSFER_COMPLETED operational audit event atomically within PostgreSQL transaction
-        auditEventService.recordEvent(
-                authenticatedUser != null ? authenticatedUser.getId() : null,
-                com.parth.ledger.audit.AuditEventType.TRANSFER_COMPLETED,
-                com.parth.ledger.audit.AuditEntityType.TRANSACTION,
-                transaction.getId(),
-                java.util.Map.of(
-                        "amount", scaledAmount,
-                        "currency", currency,
-                        "sourceAccountId", sourceId,
-                        "destinationAccountId", destinationId
-                )
-        );
-
-        log.info("Successfully executed transfer: txId={}, amount={} {}, from={} to={}",
-                transaction.getId(), scaledAmount, currency, sourceId, destinationId);
-
-        TransferResponseDto response = TransferResponseDto.from(transaction);
-
-        // Store successful response in Redis ONLY after the PostgreSQL transaction commits
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        idempotencyCacheService.set(cleanIdempotencyKey, response);
-                    } catch (Exception e) {
-                        log.warn("Failed to cache response in Redis after commit for key '{}': {}",
-                                cleanIdempotencyKey, e.getMessage());
-                    }
-                }
-            });
-        } else {
-            try {
-                idempotencyCacheService.set(cleanIdempotencyKey, response);
+                cachedResponse = idempotencyCacheService.get(cleanIdempotencyKey);
             } catch (Exception e) {
-                log.warn("Failed to cache response in Redis for key '{}': {}",
-                        cleanIdempotencyKey, e.getMessage());
+                log.warn("Error accessing Redis idempotency cache: {}. Failing open to PostgreSQL.", e.getMessage());
             }
-        }
 
-        // 18. Return transaction result DTO
-        return response;
+            if (cachedResponse.isPresent()) {
+                TransferResponseDto cached = cachedResponse.get();
+                boolean sameSource = cached.sourceAccountId().equals(request.sourceAccountId());
+                boolean sameDest = cached.destinationAccountId().equals(request.destinationAccountId());
+                boolean sameAmount = cached.amount().compareTo(scaledAmount) == 0;
+                boolean sameCurrency = cached.currency().equalsIgnoreCase(currency);
+                boolean sameDesc = Objects.equals(cached.description(), cleanDescription);
+
+                if (sameSource && sameDest && sameAmount && sameCurrency && sameDesc) {
+                    // Verify source account ownership on Redis fast-path hit
+                    if (!accountRepository.existsByIdAndUserId(request.sourceAccountId(), authenticatedUser.getId())) {
+                        log.warn("Unauthorized attempt to access cached transfer by user {}",
+                                com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()));
+                        throw new AccountOwnershipException("Authenticated user does not own source account");
+                    }
+                    if (ledgerMetrics != null) {
+                        ledgerMetrics.recordIdempotencyOutcome("TRANSFER", "REPLAY");
+                        ledgerMetrics.recordIdempotencyDuration("TRANSFER", "REPLAY", System.currentTimeMillis() - startTime);
+                    }
+                    log.info("Redis idempotency fast-path hit. Returning cached transaction {}",
+                            com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(cached.transactionId()));
+                    return cached;
+                } else {
+                    log.warn("Idempotency conflict detected in Redis cache for transfer.");
+                    throw new IdempotencyConflictException(
+                            "Idempotency key '" + cleanIdempotencyKey + "' was already used for a transfer with different parameters"
+                    );
+                }
+            }
+
+            // 6. Pre-lock Idempotency Check: Fast return for committed retries or conflict detection
+            Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
+            if (existingTx.isPresent()) {
+                return handleExistingTransaction(existingTx.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser, startTime);
+            }
+
+            // 8. Deterministic Lock Ordering
+            UUID sourceId = request.sourceAccountId();
+            UUID destinationId = request.destinationAccountId();
+
+            UUID firstLockId;
+            UUID secondLockId;
+            if (sourceId.compareTo(destinationId) < 0) {
+                firstLockId = sourceId;
+                secondLockId = destinationId;
+            } else {
+                firstLockId = destinationId;
+                secondLockId = sourceId;
+            }
+
+            Account firstAccount = accountRepository.findByIdForUpdate(firstLockId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + firstLockId));
+            Account secondAccount = accountRepository.findByIdForUpdate(secondLockId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + secondLockId));
+
+            Account sourceAccount = sourceId.equals(firstAccount.getId()) ? firstAccount : secondAccount;
+            Account destinationAccount = destinationId.equals(secondAccount.getId()) ? secondAccount : firstAccount;
+
+            // Post-lock Idempotency Re-check
+            Optional<Transaction> txAfterLock = transactionRepository.findByIdempotencyKey(cleanIdempotencyKey);
+            if (txAfterLock.isPresent()) {
+                return handleExistingTransaction(txAfterLock.get(), request, scaledAmount, currency, cleanDescription, cleanIdempotencyKey, authenticatedUser, startTime);
+            }
+
+            // Account Type Validation
+            if (sourceAccount.getAccountType() != AccountType.USER_CHECKING) {
+                log.warn("Transfer rejected: source account {} has ineligible type {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId), sourceAccount.getAccountType());
+                throw new InvalidAccountTypeException("Source account must be a USER_CHECKING account: " + sourceId);
+            }
+            if (destinationAccount.getAccountType() != AccountType.USER_CHECKING) {
+                log.warn("Transfer rejected: destination account {} has ineligible type {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(destinationId), destinationAccount.getAccountType());
+                throw new InvalidAccountTypeException("Destination account must be a USER_CHECKING account: " + destinationId);
+            }
+
+            // 9. Source Account Ownership Authorization
+            if (sourceAccount.getUser() == null || !sourceAccount.getUser().getId().equals(authenticatedUser.getId())) {
+                log.warn("Unauthorized transfer: user {} does not own source account {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()),
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId));
+                throw new AccountOwnershipException("Authenticated user does not own source account");
+            }
+
+            // Account Status Validation
+            if (sourceAccount.getStatus() == AccountStatus.FROZEN) {
+                log.warn("Transfer rejected: source account {} is FROZEN", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId));
+                throw new AccountFrozenException("Source account " + sourceId + " is FROZEN");
+            }
+            if (sourceAccount.getStatus() == AccountStatus.CLOSED) {
+                log.warn("Transfer rejected: source account {} is CLOSED", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId));
+                throw new AccountClosedException("Source account " + sourceId + " is CLOSED");
+            }
+            if (sourceAccount.getStatus() != AccountStatus.ACTIVE) {
+                log.warn("Transfer rejected: source account {} is in status {}", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId), sourceAccount.getStatus());
+                throw new AccountStatusException("Source account " + sourceId + " is not ACTIVE");
+            }
+
+            if (destinationAccount.getStatus() == AccountStatus.FROZEN) {
+                log.warn("Transfer rejected: destination account {} is FROZEN", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(destinationId));
+                throw new AccountFrozenException("Destination account " + destinationId + " is FROZEN");
+            }
+            if (destinationAccount.getStatus() == AccountStatus.CLOSED) {
+                log.warn("Transfer rejected: destination account {} is CLOSED", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(destinationId));
+                throw new AccountClosedException("Destination account " + destinationId + " is CLOSED");
+            }
+            if (destinationAccount.getStatus() != AccountStatus.ACTIVE) {
+                log.warn("Transfer rejected: destination account {} is in status {}", com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(destinationId), destinationAccount.getStatus());
+                throw new AccountStatusException("Destination account " + destinationId + " is not ACTIVE");
+            }
+
+            // 2 & 5. Validate currency compatibility
+            if (!sourceAccount.getCurrency().equalsIgnoreCase(currency)) {
+                throw new CurrencyMismatchException(
+                        "Currency mismatch: transfer currency '" + currency + "' does not match source account currency '" + sourceAccount.getCurrency() + "'"
+                );
+            }
+            if (!destinationAccount.getCurrency().equalsIgnoreCase(currency)) {
+                throw new CurrencyMismatchException(
+                        "Currency mismatch: transfer currency '" + currency + "' does not match destination account currency '" + destinationAccount.getCurrency() + "'"
+                );
+            }
+
+            // 9. Check source balance
+            if (sourceAccount.getBalance().compareTo(scaledAmount) < 0) {
+                throw new InsufficientBalanceException(
+                        "Insufficient balance in source account " + sourceId + ": available "
+                                + sourceAccount.getBalance() + ", required " + scaledAmount
+                );
+            }
+
+            // 9.5. Policy Engine Evaluation
+            try {
+                policyService.evaluateAndRecordTransferLimits(sourceAccount, destinationAccount, scaledAmount);
+            } catch (com.parth.ledger.policy.PolicyViolationException ex) {
+                try {
+                    auditEventService.recordPolicyRejectionEventOnce(
+                            authenticatedUser != null ? authenticatedUser.getId() : null,
+                            com.parth.ledger.audit.AuditEventType.TRANSFER_REJECTED_POLICY,
+                            com.parth.ledger.audit.AuditEntityType.ACCOUNT,
+                            sourceId,
+                            cleanIdempotencyKey,
+                            "TRANSFER",
+                            java.util.Map.of(
+                                    "policyType", ex.getErrorCode().name(),
+                                    "reason", ex.getMessage(),
+                                    "amount", scaledAmount,
+                                    "currency", currency,
+                                    "sourceAccountId", sourceId,
+                                    "destinationAccountId", destinationId
+                            )
+                    );
+                } catch (Exception auditErr) {
+                    log.warn("Failed to record TRANSFER_REJECTED_POLICY audit event: {}", auditErr.getMessage());
+                }
+                throw ex;
+            }
+
+            // 10. Debit source account & 11. Credit destination account
+            sourceAccount.setBalance(sourceAccount.getBalance().subtract(scaledAmount));
+            destinationAccount.setBalance(destinationAccount.getBalance().add(scaledAmount));
+
+            accountRepository.save(sourceAccount);
+            accountRepository.save(destinationAccount);
+
+            // 12. Create transaction record (PENDING)
+            Transaction transaction = new Transaction(
+                    cleanIdempotencyKey,
+                    scaledAmount,
+                    currency,
+                    TransactionStatus.PENDING,
+                    sourceAccount,
+                    destinationAccount,
+                    TransactionType.TRANSFER,
+                    authenticatedUser,
+                    cleanDescription
+            );
+            transaction = transactionRepository.save(transaction);
+
+            // 13. Create DEBIT ledger entry & 14. Create CREDIT ledger entry
+            LedgerEntry debitEntry = new LedgerEntry(
+                    transaction,
+                    sourceAccount,
+                    LedgerEntryType.DEBIT,
+                    scaledAmount,
+                    currency
+            );
+            LedgerEntry creditEntry = new LedgerEntry(
+                    transaction,
+                    destinationAccount,
+                    LedgerEntryType.CREDIT,
+                    scaledAmount,
+                    currency
+            );
+
+            ledgerEntryRepository.save(debitEntry);
+            ledgerEntryRepository.save(creditEntry);
+
+            // 15. Verify double-entry ledger entries balance (totalDebits == totalCredits)
+            BigDecimal totalDebits = debitEntry.getAmount();
+            BigDecimal totalCredits = creditEntry.getAmount();
+            if (totalDebits.compareTo(totalCredits) != 0) {
+                throw new UnbalancedLedgerException(
+                        "Double-entry ledger invariant violation: total debits (" + totalDebits
+                                + ") do not equal total credits (" + totalCredits + ")"
+                );
+            }
+
+            // 16. Complete transaction
+            transaction.setStatus(TransactionStatus.COMPLETED);
+            transaction.setCompletedAt(Instant.now());
+            transaction = transactionRepository.save(transaction);
+
+            // 17. Record TRANSFER_COMPLETED operational audit event atomically within PostgreSQL transaction
+            auditEventService.recordEvent(
+                    authenticatedUser != null ? authenticatedUser.getId() : null,
+                    com.parth.ledger.audit.AuditEventType.TRANSFER_COMPLETED,
+                    com.parth.ledger.audit.AuditEntityType.TRANSACTION,
+                    transaction.getId(),
+                    java.util.Map.of(
+                            "amount", scaledAmount,
+                            "currency", currency,
+                            "sourceAccountId", sourceId,
+                            "destinationAccountId", destinationId
+                    )
+            );
+
+            log.info("Successfully executed transfer: txId={}, amount={} {}, from={} to={}",
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(transaction.getId()), scaledAmount, currency,
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(sourceId),
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(destinationId));
+
+            TransferResponseDto response = TransferResponseDto.from(transaction);
+
+            // Store successful response in Redis and record COMPLETED metrics ONLY after the PostgreSQL transaction commits
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            idempotencyCacheService.set(cleanIdempotencyKey, response);
+                        } catch (Exception e) {
+                            log.warn("Failed to cache response in Redis after commit: {}", e.getMessage());
+                        }
+                        if (ledgerMetrics != null) {
+                            ledgerMetrics.recordOperation("TRANSFER", "COMPLETED");
+                            ledgerMetrics.recordIdempotencyOutcome("TRANSFER", "FIRST_EXECUTION");
+                            ledgerMetrics.recordOperationDuration("TRANSFER", "COMPLETED", System.currentTimeMillis() - startTime);
+                        }
+                    }
+                });
+            } else {
+                try {
+                    idempotencyCacheService.set(cleanIdempotencyKey, response);
+                } catch (Exception e) {
+                    log.warn("Failed to cache response in Redis: {}", e.getMessage());
+                }
+                if (ledgerMetrics != null) {
+                    ledgerMetrics.recordOperation("TRANSFER", "COMPLETED");
+                    ledgerMetrics.recordIdempotencyOutcome("TRANSFER", "FIRST_EXECUTION");
+                    ledgerMetrics.recordOperationDuration("TRANSFER", "COMPLETED", System.currentTimeMillis() - startTime);
+                }
+            }
+
+            // 18. Return transaction result DTO
+            return response;
+
+        } catch (IdempotencyConflictException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordIdempotencyOutcome("TRANSFER", "CONFLICT");
+                ledgerMetrics.recordIdempotencyDuration("TRANSFER", "CONFLICT", System.currentTimeMillis() - startTime);
+                ledgerMetrics.recordOperation("TRANSFER", "REJECTED");
+                ledgerMetrics.recordOperationDuration("TRANSFER", "REJECTED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        } catch (AccountNotFoundException | AccountOwnershipException | AccountStatusException |
+                 CurrencyMismatchException | InsufficientBalanceException | InvalidAccountTypeException |
+                 InvalidAmountException | SameAccountTransferException | com.parth.ledger.policy.PolicyViolationException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordOperation("TRANSFER", "REJECTED");
+                ledgerMetrics.recordOperationDuration("TRANSFER", "REJECTED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        } catch (RuntimeException | Error e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordOperation("TRANSFER", "FAILED");
+                ledgerMetrics.recordOperationDuration("TRANSFER", "FAILED", System.currentTimeMillis() - startTime);
+            }
+            throw e;
+        }
     }
 
     private TransferResponseDto handleExistingTransaction(
@@ -424,7 +462,8 @@ public class TransferService {
             String currency,
             String cleanDescription,
             String idempotencyKey,
-            User authenticatedUser) {
+            User authenticatedUser,
+            long startTime) {
 
         boolean sameSource = existing.getSourceAccount().getId().equals(request.sourceAccountId());
         boolean sameDest = existing.getDestinationAccount().getId().equals(request.destinationAccountId());
@@ -435,33 +474,27 @@ public class TransferService {
         if (sameSource && sameDest && sameAmount && sameCurrency && sameDesc) {
             // Verify source account ownership on database idempotency retry
             if (existing.getSourceAccount().getUser() == null || !existing.getSourceAccount().getUser().getId().equals(authenticatedUser.getId())) {
-                log.warn("Unauthorized attempt to access existing transaction {} for source account {} by user {}",
-                        existing.getId(), existing.getSourceAccount().getId(), authenticatedUser.getId());
+                log.warn("Unauthorized attempt to access existing transaction for user {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(authenticatedUser.getId()));
                 throw new AccountOwnershipException("Authenticated user does not own source account");
             }
 
-            log.info("Idempotent retry detected for key '{}'. Returning existing transaction {}",
-                    idempotencyKey, existing.getId());
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordIdempotencyOutcome("TRANSFER", "REPLAY");
+                ledgerMetrics.recordIdempotencyDuration("TRANSFER", "REPLAY", System.currentTimeMillis() - startTime);
+            }
+
+            log.info("Idempotent retry detected for transfer. Returning existing transaction {}",
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(existing.getId()));
             TransferResponseDto response = TransferResponseDto.from(existing);
             try {
                 idempotencyCacheService.set(idempotencyKey, response);
             } catch (Exception e) {
-                log.warn("Failed to repopulate Redis cache for key '{}': {}", idempotencyKey, e.getMessage());
+                log.warn("Failed to repopulate Redis cache: {}", e.getMessage());
             }
             return response;
         } else {
-            log.warn("Idempotency conflict for key '{}'. Existing: [source={}, dest={}, amount={}, currency={}, desc={}], Request: [source={}, dest={}, amount={}, currency={}, desc={}]",
-                    idempotencyKey,
-                    existing.getSourceAccount().getId(),
-                    existing.getDestinationAccount().getId(),
-                    existing.getAmount(),
-                    existing.getCurrency(),
-                    existing.getDescription(),
-                    request.sourceAccountId(),
-                    request.destinationAccountId(),
-                    scaledAmount,
-                    currency,
-                    cleanDescription);
+            log.warn("Idempotency conflict for transfer.");
             throw new IdempotencyConflictException(
                     "Idempotency key '" + idempotencyKey + "' was already used for a transfer with different parameters"
             );

@@ -60,8 +60,8 @@ public class IdempotencyCacheService {
             T dto = objectMapper.readValue(json, responseType);
             return Optional.ofNullable(dto);
         } catch (Exception e) {
-            log.warn("Redis error while retrieving idempotency key '{}': {}. Falling back to PostgreSQL.",
-                    redisKey, e.getMessage());
+            log.warn("Redis error while retrieving cached idempotency response: {}. Falling back to PostgreSQL.",
+                    e.getMessage());
             return Optional.empty();
         }
     }
@@ -103,10 +103,10 @@ public class IdempotencyCacheService {
         try {
             String json = objectMapper.writeValueAsString(responseDto);
             redisTemplate.opsForValue().set(redisKey, json, ttl);
-            log.debug("Cached transfer response in Redis for key '{}' with TTL {}", redisKey, ttl);
+            log.debug("Cached transfer response in Redis with TTL {}", ttl);
         } catch (Exception e) {
-            log.warn("Redis error while caching idempotency key '{}': {}. Transfer remains committed in PostgreSQL.",
-                    redisKey, e.getMessage());
+            log.warn("Redis error while caching transfer response: {}. Transfer remains committed in PostgreSQL.",
+                    e.getMessage());
         }
     }
 
@@ -136,10 +136,10 @@ public class IdempotencyCacheService {
         try {
             String json = objectMapper.writeValueAsString(responseDto);
             redisTemplate.opsForValue().set(redisKey, json, ttl);
-            log.debug("Cached transaction response in Redis for key '{}' with TTL {}", redisKey, ttl);
+            log.debug("Cached transaction response in Redis with TTL {}", ttl);
         } catch (Exception e) {
-            log.warn("Redis error while caching idempotency key '{}': {}. Transaction remains committed in PostgreSQL.",
-                    redisKey, e.getMessage());
+            log.warn("Redis error while caching transaction response: {}. Transaction remains committed in PostgreSQL.",
+                    e.getMessage());
         }
     }
 
@@ -169,10 +169,10 @@ public class IdempotencyCacheService {
         try {
             String json = objectMapper.writeValueAsString(responseDto);
             redisTemplate.opsForValue().set(redisKey, json, ttl);
-            log.debug("Cached reversal response in Redis for key '{}' with TTL {}", redisKey, ttl);
+            log.debug("Cached reversal response in Redis with TTL {}", ttl);
         } catch (Exception e) {
-            log.warn("Redis error while caching idempotency key '{}': {}. Reversal remains committed in PostgreSQL.",
-                    redisKey, e.getMessage());
+            log.warn("Redis error while caching reversal response: {}. Reversal remains committed in PostgreSQL.",
+                    e.getMessage());
         }
     }
 
@@ -189,7 +189,7 @@ public class IdempotencyCacheService {
         try {
             redisTemplate.delete(redisKey);
         } catch (Exception e) {
-            log.warn("Redis error while deleting idempotency key '{}': {}", redisKey, e.getMessage());
+            log.warn("Redis error while deleting idempotency key: {}", e.getMessage());
         }
     }
 

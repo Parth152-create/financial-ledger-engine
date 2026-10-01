@@ -1,7 +1,9 @@
 package com.parth.ledger.security.ratelimit;
 
+import com.parth.ledger.observability.metrics.LedgerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -44,10 +46,15 @@ public class RedisRateLimiterService {
 
     private final StringRedisTemplate redisTemplate;
     private final RateLimitProperties properties;
+    private final LedgerMetrics ledgerMetrics;
 
-    public RedisRateLimiterService(StringRedisTemplate redisTemplate, RateLimitProperties properties) {
+    @Autowired
+    public RedisRateLimiterService(StringRedisTemplate redisTemplate,
+                                   RateLimitProperties properties,
+                                   @Autowired(required = false) LedgerMetrics ledgerMetrics) {
         this.redisTemplate = redisTemplate;
         this.properties = properties;
+        this.ledgerMetrics = ledgerMetrics;
         if (properties.enabled()) {
             RateLimitProperties.LimitConfig fin = properties.effectiveFinancial();
             if (properties.loadTest() != null && properties.loadTest().enabled()) {
@@ -62,6 +69,10 @@ public class RedisRateLimiterService {
         }
     }
 
+    public RedisRateLimiterService(StringRedisTemplate redisTemplate, RateLimitProperties properties) {
+        this(redisTemplate, properties, null);
+    }
+
     public void checkLoginAllowed(String clientIp, String email) {
         if (!properties.enabled()) {
             return;
@@ -73,6 +84,9 @@ public class RedisRateLimiterService {
                 checkKeyLimit(loginIdentityKey(normalizeEmail(email)), properties.login().maxAttempts(), properties.login().windowSeconds());
             }
         } catch (RateLimitExceededException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordRateLimitRejection("LOGIN");
+            }
             throw e;
         } catch (Exception e) {
             handleRedisFailure("checkLoginAllowed", e);
@@ -125,6 +139,9 @@ public class RedisRateLimiterService {
                 }
             }
         } catch (RateLimitExceededException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordRateLimitRejection("SIGNUP");
+            }
             throw e;
         } catch (Exception e) {
             handleRedisFailure("checkAndRecordSignup", e);
@@ -148,9 +165,12 @@ public class RedisRateLimiterService {
                 }
             }
         } catch (RateLimitExceededException e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordRateLimitRejection("FINANCIAL");
+            }
             throw e;
         } catch (Exception e) {
-            log.warn("Redis error during financial rate limiting for '{}': {}. Failing open.", keyIdentifier, e.getMessage());
+            log.warn("Redis error during financial rate limiting: {}. Failing open.", e.getMessage());
         }
     }
 

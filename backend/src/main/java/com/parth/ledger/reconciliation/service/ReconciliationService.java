@@ -39,13 +39,23 @@ public class ReconciliationService {
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ReconciliationService(AccountRepository accountRepository,
+                                 LedgerEntryRepository ledgerEntryRepository,
+                                 AuthenticatedUserService authenticatedUserService,
+                                 @org.springframework.beans.factory.annotation.Autowired(required = false) com.parth.ledger.observability.metrics.LedgerMetrics ledgerMetrics) {
+        this.accountRepository = accountRepository;
+        this.ledgerEntryRepository = ledgerEntryRepository;
+        this.authenticatedUserService = authenticatedUserService;
+        this.ledgerMetrics = ledgerMetrics;
+    }
 
     public ReconciliationService(AccountRepository accountRepository,
                                  LedgerEntryRepository ledgerEntryRepository,
                                  AuthenticatedUserService authenticatedUserService) {
-        this.accountRepository = accountRepository;
-        this.ledgerEntryRepository = ledgerEntryRepository;
-        this.authenticatedUserService = authenticatedUserService;
+        this(accountRepository, ledgerEntryRepository, authenticatedUserService, null);
     }
 
     /**
@@ -61,18 +71,44 @@ public class ReconciliationService {
             throw new IllegalArgumentException("Account ID must not be null");
         }
 
-        User currentUser = authenticatedUserService.getCurrentUser();
-
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
-
-        if (account.getUser() == null || !account.getUser().getId().equals(currentUser.getId())) {
-            log.warn("Unauthorized reconciliation attempt: user {} does not own account {}",
-                    currentUser.getId(), accountId);
-            throw new AccountOwnershipException("Authenticated user does not own account: " + accountId);
+        if (ledgerMetrics != null) {
+            ledgerMetrics.recordReconciliationRun("SINGLE_ACCOUNT");
         }
 
-        return calculateReconciliation(account);
+        try {
+            User currentUser = authenticatedUserService.getCurrentUser();
+
+            Account account = accountRepository.findById(accountId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+            if (account.getUser() == null || !account.getUser().getId().equals(currentUser.getId())) {
+                log.warn("Unauthorized reconciliation attempt: user {} does not own account {}",
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(currentUser.getId()),
+                        com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(accountId));
+                throw new AccountOwnershipException("Authenticated user does not own account: " + accountId);
+            }
+
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationAccountsChecked("SINGLE_ACCOUNT", 1);
+            }
+
+            ReconciliationResultDto result = calculateReconciliation(account);
+            if (ledgerMetrics != null) {
+                if (result.status() == ReconciliationStatus.CONSISTENT) {
+                    ledgerMetrics.recordReconciliationConsistent("SINGLE_ACCOUNT", 1);
+                } else {
+                    ledgerMetrics.recordReconciliationDiscrepancy("SINGLE_ACCOUNT", 1);
+                }
+            }
+            return result;
+        } catch (AccountNotFoundException | AccountOwnershipException | IllegalArgumentException e) {
+            throw e;
+        } catch (RuntimeException | Error e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationError("SINGLE_ACCOUNT");
+            }
+            throw e;
+        }
     }
 
     /**
@@ -88,10 +124,35 @@ public class ReconciliationService {
             throw new IllegalArgumentException("Account ID must not be null");
         }
 
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+        if (ledgerMetrics != null) {
+            ledgerMetrics.recordReconciliationRun("SYSTEM");
+        }
 
-        return calculateReconciliation(account);
+        try {
+            Account account = accountRepository.findById(accountId)
+                    .orElseThrow(() -> new AccountNotFoundException("Account not found: " + accountId));
+
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationAccountsChecked("SYSTEM", 1);
+            }
+
+            ReconciliationResultDto result = calculateReconciliation(account);
+            if (ledgerMetrics != null) {
+                if (result.status() == ReconciliationStatus.CONSISTENT) {
+                    ledgerMetrics.recordReconciliationConsistent("SYSTEM", 1);
+                } else {
+                    ledgerMetrics.recordReconciliationDiscrepancy("SYSTEM", 1);
+                }
+            }
+            return result;
+        } catch (AccountNotFoundException | IllegalArgumentException e) {
+            throw e;
+        } catch (RuntimeException | Error e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationError("SYSTEM");
+            }
+            throw e;
+        }
     }
 
     /**
@@ -100,30 +161,52 @@ public class ReconciliationService {
      * @return OverallReconciliationDto summarizing total, consistent, and discrepancy counts.
      */
     public OverallReconciliationDto reconcileUserAccounts() {
-        User currentUser = authenticatedUserService.getCurrentUser();
-        List<Account> userAccounts = accountRepository.findByUserId(currentUser.getId());
-
-        List<ReconciliationResultDto> results = new ArrayList<>();
-        int consistentCount = 0;
-        int discrepancyCount = 0;
-
-        for (Account account : userAccounts) {
-            ReconciliationResultDto result = calculateReconciliation(account);
-            results.add(result);
-            if (result.status() == ReconciliationStatus.CONSISTENT) {
-                consistentCount++;
-            } else {
-                discrepancyCount++;
-            }
+        if (ledgerMetrics != null) {
+            ledgerMetrics.recordReconciliationRun("USER_ACCOUNTS");
         }
 
-        return new OverallReconciliationDto(
-                userAccounts.size(),
-                consistentCount,
-                discrepancyCount,
-                results,
-                Instant.now()
-        );
+        try {
+            User currentUser = authenticatedUserService.getCurrentUser();
+            List<Account> userAccounts = accountRepository.findByUserId(currentUser.getId());
+
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationAccountsChecked("USER_ACCOUNTS", userAccounts.size());
+            }
+
+            List<ReconciliationResultDto> results = new ArrayList<>();
+            int consistentCount = 0;
+            int discrepancyCount = 0;
+
+            for (Account account : userAccounts) {
+                ReconciliationResultDto result = calculateReconciliation(account);
+                results.add(result);
+                if (result.status() == ReconciliationStatus.CONSISTENT) {
+                    consistentCount++;
+                } else {
+                    discrepancyCount++;
+                }
+            }
+
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationConsistent("USER_ACCOUNTS", consistentCount);
+                if (discrepancyCount > 0) {
+                    ledgerMetrics.recordReconciliationDiscrepancy("USER_ACCOUNTS", discrepancyCount);
+                }
+            }
+
+            return new OverallReconciliationDto(
+                    userAccounts.size(),
+                    consistentCount,
+                    discrepancyCount,
+                    results,
+                    Instant.now()
+            );
+        } catch (RuntimeException | Error e) {
+            if (ledgerMetrics != null) {
+                ledgerMetrics.recordReconciliationError("USER_ACCOUNTS");
+            }
+            throw e;
+        }
     }
 
     /**
@@ -148,11 +231,11 @@ public class ReconciliationService {
                 : ReconciliationStatus.DISCREPANCY;
 
         if (status == ReconciliationStatus.DISCREPANCY) {
-            log.warn("Financial discrepancy detected for account {}: snapshotBalance={}, ledgerBalance={}, difference={}",
-                    account.getId(), snapshotBalance, ledgerBalance, difference);
+            log.warn("Financial discrepancy detected for account {}: snapshotBalance={}, ledgerBalance={}, difference={}, status=DISCREPANCY",
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(account.getId()), snapshotBalance, ledgerBalance, difference);
         } else {
             log.debug("Account {} is consistent: snapshotBalance={}, ledgerBalance={}",
-                    account.getId(), snapshotBalance, ledgerBalance);
+                    com.parth.ledger.observability.logging.MaskingUtils.maskAccountId(account.getId()), snapshotBalance, ledgerBalance);
         }
 
         return new ReconciliationResultDto(

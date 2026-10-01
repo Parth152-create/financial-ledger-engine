@@ -113,4 +113,50 @@ class CorrelationIdFilterIntegrationTest extends BaseIntegrationTest {
         assertThat(resultMap).hasSize(threadCount);
         resultMap.forEach((expected, actual) -> assertThat(actual).isEqualTo(expected));
     }
+
+    @Test
+    @DisplayName("6. Unsafe correlation ID with CRLF/injection is rejected and replaced with safe UUID")
+    void unsafeCorrelationIdWithCrlfRejected() throws Exception {
+        MvcResult result = mockMvc.perform(get("/actuator/health")
+                        .header("X-Request-Id", "bad\r\ninjected:value"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseId = result.getResponse().getHeader("X-Request-Id");
+        assertThat(responseId).isNotBlank();
+        assertThat(responseId).doesNotContain("\r", "\n", "injected");
+        UUID parsed = UUID.fromString(responseId);
+        assertThat(parsed).isNotNull();
+    }
+
+    @Test
+    @DisplayName("7. Unsafe correlation ID with SQL injection characters is rejected and replaced with safe UUID")
+    void unsafeCorrelationIdWithSqlCharsRejected() throws Exception {
+        MvcResult result = mockMvc.perform(get("/actuator/health")
+                        .header("X-Correlation-Id", "'; DROP TABLE users; --"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseId = result.getResponse().getHeader("X-Correlation-Id");
+        assertThat(responseId).isNotBlank();
+        assertThat(responseId).doesNotContain("DROP", "TABLE", ";");
+        UUID parsed = UUID.fromString(responseId);
+        assertThat(parsed).isNotNull();
+    }
+
+    @Test
+    @DisplayName("8. Correlation ID exceeding 64 characters is rejected and replaced with safe UUID")
+    void correlationIdExceedingLengthRejected() throws Exception {
+        String longId = "a".repeat(65);
+        MvcResult result = mockMvc.perform(get("/actuator/health")
+                        .header("X-Request-Id", longId))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseId = result.getResponse().getHeader("X-Request-Id");
+        assertThat(responseId).isNotBlank();
+        assertThat(responseId).isNotEqualTo(longId);
+        UUID parsed = UUID.fromString(responseId);
+        assertThat(parsed).isNotNull();
+    }
 }
